@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>BIOSAVEUR · Poulet Molo Molo</title>
+  <meta name="description" content="Poulet halal et traçable livré à Abidjan. Cotisez à votre rythme, choisissez votre créneau, suivez votre livraison.">
+  <meta name="theme-color" content="#103d3a">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alan+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <div id="app"><div class="loading" style="min-height:60vh"><div class="spin" role="status" aria-label="Chargement"></div></div></div>
+  <div id="ov"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <noscript><p style="padding:24px">Activez JavaScript pour utiliser la boutique BIOSAVEUR.</p></noscript>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
+  <script src="/js/core.js"></script>
+  <script src="/js/map.js"></script>
+  <script src="/js/client.js"></script>
+  <script src="/js/driver.js"></script>
+  <script src="/js/admin.js"></script>
+  <script>App.start();</script>
+</body>
+</html>

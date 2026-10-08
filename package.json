@@ -1,0 +1,24 @@
+{
+  "name": "biosaveur-molo-molo",
+  "version": "1.0.0",
+  "description": "BIOSAVEUR — Poulet Molo Molo : boutique en ligne, cotisation poulet, livraisons suivies par QR code et carte.",
+  "main": "src/server.js",
+  "private": true,
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "migrate": "node src/migrate.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "express": "^4.21.1",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1",
+    "qrcode": "^1.5.4"
+  }
+}
