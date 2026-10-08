@@ -266,7 +266,7 @@
     el.disabled = true;
     var body = { items: Cart.items().map(function (c) { return { product_id: c.pid, option: c.opt, qty: c.q }; }), day: days()[CV.day], slot: App.cfg.slots[CV.slot], pay_method: CV.pay };
     App.post('/client/orders', body).then(function (r) {
-      if (r.payment_url) { location.href = r.payment_url; return; }
+      if (r.payment_url) { App.openPayment(r.payment_url, r.transaction_id); return; }
       Cart.clear();
       App.go('#/commande/' + r.order.id + '?ok=1');
     }).catch(function (e) { el.disabled = false; App.err(e); });
@@ -312,7 +312,10 @@
   }
   function shell(cur, inner) { return '<div class="acc">' + accNav(cur) + '<div class="accm">' + inner + '</div></div>'; }
   App.accShell = shell;
-  App.A.logout = function () { App.post('/auth/logout').then(function () { App.cfg.user = null; App.go('#/'); App.toast('Vous êtes déconnecté.'); }); };
+  App.A.logout = function () {
+    var done = function () { App.token(null); App.cfg.user = null; App.go('#/'); App.toast('Vous êtes déconnecté.'); };
+    App.post('/auth/logout').then(done, done);
+  };
 
   App.route('commandes', function () {
     needLogin();
@@ -406,7 +409,7 @@
   App.F.vers = function (fd) {
     return App.post('/client/cotisation/versement', { amount: +fd.get('m'), method: fd.get('moyen') }).then(function (r) {
       App.modal(null);
-      if (r.payment_url) { location.href = r.payment_url; return; }
+      if (r.payment_url) { App.openPayment(r.payment_url, r.transaction_id); return; }
       App.toast('Message envoyé à l’équipe : remettez le montant au livreur ou en agence.');
     });
   };
@@ -512,15 +515,16 @@
   }
   App.route('connexion', function (r) { return authPage('login', r); });
   App.route('inscription', function (r) { return authPage('register', r); });
-  function afterAuth(u, form) {
+  function afterAuth(u, form, token) {
+    if (token) App.token(token);
     App.cfg.user = u;
     var s = form.getAttribute('data-suite');
     App.loadConfig().then(function () { App.go(s || (u.role === 'livreur' ? '#/livreur' : u.role === 'admin' ? '#/admin' : '#/')); });
   }
-  App.F.login = function (fd, form) { return App.post('/auth/login', { phone: fd.get('phone'), password: fd.get('password') }).then(function (r) { afterAuth(r.user, form); }); };
+  App.F.login = function (fd, form) { return App.post('/auth/login', { phone: fd.get('phone'), password: fd.get('password') }).then(function (r) { afterAuth(r.user, form, r.token); }); };
   App.F.register = function (fd, form) {
     var b = {}; fd.forEach(function (v, k) { b[k] = v; });
-    return App.post('/auth/register', b).then(function (r) { App.toast('Compte créé. Bienvenue !'); afterAuth(r.user, form); });
+    return App.post('/auth/register', b).then(function (r) { App.toast('Compte créé. Bienvenue !'); afterAuth(r.user, form, r.token); });
   };
 
   /* ---------- paiement en ligne ---------- */

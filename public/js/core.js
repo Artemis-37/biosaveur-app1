@@ -68,14 +68,23 @@
   };
 
   /* ---------- API ---------- */
+  var ENV = window.BSV_ENV || {};
+  App.native = !!ENV.native;
+  App.apiBase = (ENV.apiBase || '').replace(/\/$/, '');
+  App.token = function (t) {
+    if (t === undefined) return App.store.get('token', null);
+    App.store.set('token', t);
+  };
   App.api = function (method, url, body) {
-    var opt = { method: method, headers: { 'X-Requested-With': 'biosaveur' }, credentials: 'same-origin' };
+    var opt = { method: method, headers: { 'X-Requested-With': 'biosaveur' }, credentials: App.apiBase ? 'omit' : 'same-origin' };
+    var tk = App.token(); if (tk) opt.headers.Authorization = 'Bearer ' + tk;
+    if (App.native) opt.headers['X-Client'] = 'app';
     if (body !== undefined) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
-    return fetch('/api' + url, opt).then(function (r) {
+    return fetch(App.apiBase + '/api' + url, opt).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (j) {
         if (!r.ok) {
           var e = new Error(j.error || 'Erreur ' + r.status); e.status = r.status;
-          if (r.status === 401) { App.cfg.user = null; }
+          if (r.status === 401) { App.cfg.user = null; if (tk) App.token(null); }
           throw e;
         }
         return j;
@@ -187,7 +196,7 @@
   App.loadConfig = function () { return App.get('/config').then(function (c) { App.cfg = c; }); };
   App.start = function () {
     App.loadConfig().then(App.render, function (e) {
-      document.getElementById('app').innerHTML = '<div class="wrap"><div class="card empty" style="margin-top:40px"><strong>Service momentanément indisponible</strong><span class="muted small">' + App.esc(e.message) + '</span><button class="btn p" onclick="location.reload()">Réessayer</button></div></div>';
+      document.getElementById('app').innerHTML = '<div class="wrap"><div class="card empty" style="margin-top:40px"><span class="o">' + App.ic('truck', 'l') + '</span><strong>Connexion au service impossible</strong><span class="muted small">' + App.esc(e.message) + ' Le serveur peut mettre jusqu’à une minute à se réveiller.</span><button class="btn p" onclick="location.reload()">Réessayer</button></div></div>';
     });
     setInterval(function () { if (App.cfg.user && document.visibilityState === 'visible') App.refreshBadges(); }, 60000);
   };

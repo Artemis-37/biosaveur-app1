@@ -36,7 +36,7 @@ function roundAmount(n) {
 /**
  * Crée un guichet de paiement. Renvoie { payment_url } ou lève une erreur lisible.
  */
-async function initPayment({ transactionId, amount, description, user }) {
+async function initPayment({ transactionId, amount, description, user, fromApp }) {
   if (mode() === 'simulation') {
     return { payment_url: `${config.publicUrl}/#/paiement-simule/${encodeURIComponent(transactionId)}`, simulated: true };
   }
@@ -50,7 +50,7 @@ async function initPayment({ transactionId, amount, description, user }) {
     currency: 'XOF',
     description: String(description).replace(/[^\p{L}\p{N} .,'-]/gu, ' ').slice(0, 120),
     notify_url: `${config.publicUrl}/api/cinetpay/notify`,
-    return_url: `${config.publicUrl}/api/cinetpay/return?tx=${encodeURIComponent(transactionId)}`,
+    return_url: `${config.publicUrl}/api/cinetpay/return?tx=${encodeURIComponent(transactionId)}${fromApp ? '&app=1' : ''}`,
     channels: 'ALL',
     lang: 'fr',
     customer_id: String(user.id),

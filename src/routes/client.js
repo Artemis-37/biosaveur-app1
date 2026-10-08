@@ -48,8 +48,8 @@ r.get('/orders', h(async (req, res) => {
 }));
 
 r.post('/orders', h(async (req, res) => {
-  const out = await services.createOrder(req.user, req.body);
-  res.json({ order: await services.orderWithItems(out.order), payment_url: out.payment_url || null });
+  const out = await services.createOrder(req.user, req.body, req.get('X-Client') === 'app');
+  res.json({ order: await services.orderWithItems(out.order), payment_url: out.payment_url || null, transaction_id: out.transaction_id || null });
 }));
 
 r.get('/orders/:id', h(async (req, res) => {
@@ -109,7 +109,7 @@ r.post('/cotisation/versement', h(async (req, res) => {
     return res.json({ cash: true });
   }
   if (!(await services.onlinePaymentEnabled())) throw bad('Le paiement en ligne n’est pas encore disponible. Choisissez le versement en espèces.');
-  const pay = await services.startPayment(req.user, 'versement', cot.id, amount, `Versement cotisation BIOSAVEUR`);
+  const pay = await services.startPayment(req.user, 'versement', cot.id, amount, `Versement cotisation BIOSAVEUR`, req.get('X-Client') === 'app');
   res.json({ payment_url: pay.payment_url, transaction_id: pay.transaction_id });
 }));
 

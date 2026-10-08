@@ -1,0 +1,23 @@
+{
+  "appId": "ci.biosaveur.molomolo",
+  "appName": "BIOSAVEUR",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#103d3a"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 3000,
+      "launchAutoHide": false,
+      "backgroundColor": "#103d3a",
+      "showSpinner": false
+    }
+  }
+}

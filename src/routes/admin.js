@@ -265,7 +265,7 @@ r.put('/cinetpay', h(async (req, res) => {
 
 r.post('/cinetpay/test', h(async (req, res) => {
   if (cinetpay.mode() === 'off') throw bad('CinetPay n’est pas configuré.');
-  const p = await services.startPayment(req.user, 'test', null, 100, 'Transaction de test BIOSAVEUR');
+  const p = await services.startPayment(req.user, 'test', null, 100, 'Transaction de test BIOSAVEUR', req.get('X-Client') === 'app');
   res.json(p);
 }));
 

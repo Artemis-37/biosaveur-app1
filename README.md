@@ -1,6 +1,6 @@
 # BIOSAVEUR · Poulet Molo Molo
 
-Application web (mobile et ordinateur) de BIOSAVEUR / AGRO VIVDURABLE SARL :
+Site web et applis Android / iOS de BIOSAVEUR / AGRO VIVDURABLE SARL :
 boutique de poulet halal et traçable, cotisation poulet, livraisons suivies sur carte et confirmées par QR code.
 
 ## Ce que fait l'application
@@ -40,6 +40,39 @@ Tests : `DATABASE_URL=postgres://…/biosaveur_test npm test`
 5. Réglez `DEPOT_LAT` / `DEPOT_LNG` sur la position réelle de l'entrepôt (départ des tournées).
 
 > La base PostgreSQL gratuite de Render est limitée dans le temps. Pour la production, passez la base sur une offre payante afin de ne pas perdre de données.
+
+## Applis Android et iOS
+
+Les applis mobiles reprennent la même interface, embarquée dans l'appli (Capacitor), et dialoguent avec le serveur Render. Un seul code pour le site web, Android et iOS.
+
+- Identifiant de l'appli : `ci.biosaveur.molomolo` · nom affiché : **BIOSAVEUR**
+- Fonctions natives : caméra (scan du QR par le livreur), localisation (position de livraison du client), ouverture de Google Maps / Waze, paiement CinetPay dans le navigateur du téléphone puis retour automatique dans l'appli, bouton retour Android.
+- Adresse du serveur utilisée par les applis : variable `APP_API_URL` (par défaut `https://biosaveur-app.onrender.com`). Si votre service Render a une autre adresse, définissez-la dans GitHub → **Settings → Secrets and variables → Actions → Variables** → `APP_API_URL`.
+
+### Android
+
+- **APK de test** : à chaque envoi sur `main`, GitHub compile l'appli (onglet **Actions → Appli Android → Artifacts**). Le fichier `.apk` s'installe directement sur un téléphone (autoriser « sources inconnues »).
+- **Play Store** : créer une clé de signature une seule fois et la garder précieusement :
+  ```bash
+  keytool -genkey -v -keystore biosaveur.keystore -alias biosaveur -keyalg RSA -keysize 2048 -validity 10000
+  base64 -w0 biosaveur.keystore   # à copier dans le secret ANDROID_KEYSTORE_BASE64
+  ```
+  Puis ajouter dans GitHub → **Settings → Secrets → Actions** : `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`biosaveur`), `ANDROID_KEY_PASSWORD`. La compilation suivante produit le fichier `.aab` à envoyer sur la [Play Console](https://play.google.com/console) (compte développeur Google : 25 $ une fois).
+- En local : `npm run app:android` ouvre le projet dans Android Studio ; `npm run app:apk` compile un APK.
+
+### iOS
+
+Apple impose un Mac avec Xcode et un compte Apple Developer (99 $/an) pour publier.
+
+1. Sur un Mac : `npm install` puis `npm run app:ios` (ouvre Xcode).
+2. Dans Xcode : **Signing & Capabilities** → choisir votre équipe Apple, puis **Product → Archive** → **Distribute App** → App Store Connect.
+3. Sur [App Store Connect](https://appstoreconnect.apple.com) : fiche de l'appli, captures d'écran, puis envoi en vérification (TestFlight possible avant).
+
+Le workflow GitHub **Appli iOS** (à lancer depuis l'onglet Actions) vérifie que le projet iOS compile sur un Mac fourni par GitHub.
+
+### Mettre à jour les applis
+
+Les écrans font partie de l'appli : après une modification de l'interface (`public/`), il faut publier une nouvelle version sur les stores. Les changements côté serveur (prix, produits, règles) sont pris en compte immédiatement, sans mise à jour.
 
 ## Activer CinetPay
 

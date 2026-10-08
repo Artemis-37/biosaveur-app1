@@ -11,6 +11,7 @@ const MAX_AGE = 30 * 24 * 3600 * 1000; // 30 jours
 const hash = (pw) => bcrypt.hash(pw, 10);
 const check = (pw, h) => bcrypt.compare(pw, h);
 
+// Ouvre une session : cookie httpOnly pour le site web, jeton renvoyé pour les applis mobiles.
 function setSession(res, user) {
   const token = jwt.sign({ uid: user.id, role: user.role }, config.jwtSecret, { expiresIn: '30d' });
   res.cookie(COOKIE, token, {
@@ -19,6 +20,7 @@ function setSession(res, user) {
     secure: config.isProd,
     maxAge: MAX_AGE,
   });
+  return token;
 }
 function clearSession(res) {
   res.clearCookie(COOKIE);
@@ -27,7 +29,8 @@ function clearSession(res) {
 // Charge l'utilisateur connecté (ou null) dans req.user.
 async function loadUser(req, _res, next) {
   req.user = null;
-  const token = req.cookies && req.cookies[COOKIE];
+  const auth = req.get('authorization') || '';
+  const token = (auth.startsWith('Bearer ') ? auth.slice(7) : '') || (req.cookies && req.cookies[COOKIE]);
   if (!token) return next();
   try {
     const p = jwt.verify(token, config.jwtSecret);

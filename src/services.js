@@ -28,7 +28,7 @@ function checkDelivery(day, slot) {
  * Crée une commande boutique. Le stock est réservé immédiatement.
  * Renvoie { order, payment_url? }.
  */
-async function createOrder(user, { items, day, slot, pay_method }) {
+async function createOrder(user, { items, day, slot, pay_method }, fromApp = false) {
   if (!Array.isArray(items) || !items.length) throw bad('Votre panier est vide.');
   if (items.length > 30) throw bad('Trop d’articles dans une même commande.');
   checkDelivery(day, slot);
@@ -94,8 +94,8 @@ async function createOrder(user, { items, day, slot, pay_method }) {
 
   if (pay_method === 'cinetpay') {
     try {
-      const pay = await startPayment(user, 'commande', result.id, result.total, `Commande ${result.number} BIOSAVEUR`);
-      return { order: result, payment_url: pay.payment_url };
+      const pay = await startPayment(user, 'commande', result.id, result.total, `Commande ${result.number} BIOSAVEUR`, fromApp);
+      return { order: result, payment_url: pay.payment_url, transaction_id: pay.transaction_id };
     } catch (e) {
       await cancelOrder(result.id, 'paiement non initialisé');
       throw bad(e.message);
@@ -121,12 +121,12 @@ async function onlinePaymentEnabled() {
   return (await db.getSetting('cinetpay_enabled', cinetpay.mode() === 'simulation' ? 'true' : 'false')) === 'true';
 }
 
-async function startPayment(user, purpose, refId, amount, description) {
+async function startPayment(user, purpose, refId, amount, description, fromApp = false) {
   const transactionId = `BSV${Date.now().toString(36).toUpperCase()}${code(4)}`;
   const amt = cinetpay.roundAmount(amount);
   await db.query('INSERT INTO payments(transaction_id,user_id,purpose,ref_id,amount) VALUES ($1,$2,$3,$4,$5)',
     [transactionId, user ? user.id : null, purpose, refId, amt]);
-  const r = await cinetpay.initPayment({ transactionId, amount: amt, description, user: user || { id: 0, name: 'Test BIOSAVEUR', phone: '0000000000' } });
+  const r = await cinetpay.initPayment({ transactionId, amount: amt, description, fromApp, user: user || { id: 0, name: 'Test BIOSAVEUR', phone: '0000000000' } });
   await db.query('UPDATE payments SET payment_url=$2, updated_at=now() WHERE transaction_id=$1', [transactionId, r.payment_url]);
   return { transaction_id: transactionId, payment_url: r.payment_url, simulated: !!r.simulated };
 }

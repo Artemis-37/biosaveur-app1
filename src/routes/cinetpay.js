@@ -33,6 +33,16 @@ async function back(req, res) {
   if (tx) {
     try { await services.syncPayment(tx); } catch (_) { /* l'écran de suivi réessaiera */ }
   }
+  if (req.query.app === '1') {
+    // Paiement lancé depuis l'appli : le client est dans le navigateur du téléphone.
+    const p = tx ? await db.one('SELECT status FROM payments WHERE transaction_id=$1', [tx]) : null;
+    const ok = p && p.status === 'ACCEPTED';
+    res.set('Content-Type', 'text/html; charset=utf-8').send(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BIOSAVEUR</title>
+<style>body{margin:0;font-family:system-ui,sans-serif;background:#f3f5f1;color:#17211f;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px;box-sizing:border-box}
+.c{background:#fff;border-radius:16px;padding:28px;max-width:380px;text-align:center}h1{color:#103d3a;font-size:22px}</style></head>
+<body><div class="c"><h1>${ok ? 'Paiement reçu' : 'Paiement en cours de vérification'}</h1><p>Vous pouvez fermer cette page et revenir dans l’application BIOSAVEUR : votre commande s’y met à jour automatiquement.</p></div></body></html>`);
+    return;
+  }
   res.redirect(303, `/#/paiement/${encodeURIComponent(tx)}`);
 }
 r.get('/return', h(back));

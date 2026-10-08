@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BIOSAVEUR</string>
+    <string name="title_activity_main">BIOSAVEUR</string>
+    <string name="package_name">ci.biosaveur.molomolo</string>
+    <string name="custom_url_scheme">ci.biosaveur.molomolo</string>
+</resources>

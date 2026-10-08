@@ -33,6 +33,7 @@ r.get('/config', h(async (req, res) => {
     communes: COMMUNES,
     onlinePayment: await services.onlinePaymentEnabled(),
     paymentMode: cinetpay.mode(),
+    minAppVersion: config.minAppVersion,
     demo: config.seedDemo,
   });
 }));
@@ -101,8 +102,8 @@ r.post('/auth/register', h(async (req, res) => {
     await notify(user.id, 'Bienvenue chez BIOSAVEUR ! Placez votre position sur la carte pour faciliter vos livraisons.', c);
     return user;
   });
-  setSession(res, u);
-  res.json({ user: publicUser(u) });
+  const token = setSession(res, u);
+  res.json({ user: publicUser(u), token });
 }));
 
 r.post('/auth/login', h(async (req, res) => {
@@ -113,8 +114,8 @@ r.post('/auth/login', h(async (req, res) => {
   attempts.delete(`login:${phone}`);
   await db.query('UPDATE users SET last_active=now() WHERE id=$1', [u.id]);
   await audit(u.id, 'connexion');
-  setSession(res, u);
-  res.json({ user: publicUser(u) });
+  const token = setSession(res, u);
+  res.json({ user: publicUser(u), token });
 }));
 
 r.post('/auth/logout', (req, res) => {

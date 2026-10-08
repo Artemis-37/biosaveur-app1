@@ -384,3 +384,9 @@ td input[type=number]{width:84px}
 .pager-note{font-size:12px;color:var(--gris)}
 .chk{display:flex;align-items:center;gap:8px;font-size:14px;min-height:40px}
 .chk input{width:18px;height:18px;accent-color:var(--vf)}
+
+/* ===== Applis Android / iOS ===== */
+html.native body{padding-top:env(safe-area-inset-top,0px);-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+html.native input,html.native textarea,html.native [style*="user-select:all"],html.native code{-webkit-user-select:text;user-select:text}
+html.native .ch{top:env(safe-area-inset-top,0px)}
+html.native footer.cf{display:none}

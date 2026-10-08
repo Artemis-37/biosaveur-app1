@@ -20,6 +20,21 @@ app.use((req, res, next) => {
   });
   next();
 });
+// CORS : les applis mobiles appellent l'API depuis capacitor://localhost (iOS) ou https://localhost (Android).
+app.use('/api', (req, res, next) => {
+  const origin = req.get('origin');
+  if (origin && config.appOrigins.includes(origin)) {
+    res.set({
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, X-Client',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Max-Age': '86400',
+      Vary: 'Origin',
+    });
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+  }
+  next();
+});
 app.use(express.json({ limit: '200kb' }));
 app.use(express.urlencoded({ extended: false, limit: '200kb' }));
 app.use(cookieParser());

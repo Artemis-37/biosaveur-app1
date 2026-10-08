@@ -1,0 +1,26 @@
+# Vérifie que l'appli iOS compile (Mac fourni par GitHub). À lancer à la demande.
+# La publication sur l'App Store se fait ensuite depuis Xcode (voir README).
+name: Appli iOS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ios:
+    runs-on: macos-14
+    env:
+      APP_API_URL: ${{ vars.APP_API_URL || 'https://biosaveur-app.onrender.com' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: node scripts/prepare-app.js && npx cap sync ios
+      - name: Compilation pour le simulateur iPhone (sans signature)
+        working-directory: ios/App
+        run: |
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build

@@ -275,7 +275,7 @@
   };
   function url(l, u) { return '<div class="stack" style="gap:4px"><span class="small" style="font-weight:600">' + l + '</span><div class="row"><code style="flex:1;min-width:0;overflow-wrap:anywhere;background:var(--fond);border-radius:6px;padding:8px 10px;font-size:13px;user-select:all">' + esc(u) + '</code><button class="btn o sm" data-act="copy" data-v="' + esc(u) + '">Copier</button></div></div>'; }
   App.A.cpToggle = function (d, el) { App.put('/admin/cinetpay', { enabled: el.checked }).then(function () { return App.loadConfig(); }).then(function () { App.toast(el.checked ? 'Paiement en ligne proposé aux clients.' : 'Paiement en ligne masqué.'); App.render(); }).catch(function (e) { App.err(e); App.render(); }); };
-  App.A.cpTest = function () { App.post('/admin/cinetpay/test').then(function (r) { location.href = r.payment_url; }).catch(App.err); };
+  App.A.cpTest = function () { App.post('/admin/cinetpay/test').then(function (r) { App.openPayment(r.payment_url, r.transaction_id); }).catch(App.err); };
   App.A.cpSync = function (d) { App.post('/admin/cinetpay/sync/' + encodeURIComponent(d.v)).then(function (r) { App.toast('État : ' + r.status); App.render(); }).catch(App.err); };
 
   S.journal = function () {
