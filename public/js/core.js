@@ -81,7 +81,12 @@
     var tk = App.token(); if (tk) opt.headers.Authorization = 'Bearer ' + tk;
     if (App.native) opt.headers['X-Client'] = 'app';
     if (body !== undefined) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+    // délai maximal : un serveur gratuit qui se réveille peut mettre ~1 min
+    var ctl = window.AbortController ? new AbortController() : null, timedOut = false;
+    var to = ctl ? setTimeout(function () { timedOut = true; ctl.abort(); }, 75000) : null;
+    if (ctl) opt.signal = ctl.signal;
     return fetch(App.apiBase + '/api' + url, opt).then(function (r) {
+      clearTimeout(to);
       return r.json().catch(function () { return {}; }).then(function (j) {
         if (!r.ok) {
           var e = new Error(j.error || 'Erreur ' + r.status); e.status = r.status;
@@ -90,7 +95,10 @@
         }
         return j;
       });
-    }, function () { throw new Error(App.native ? 'Le serveur ' + App.apiBase.replace(/^https?:\/\//, '') + ' ne répond pas.' : 'Pas de connexion internet. Vérifiez votre réseau et réessayez.'); });
+    }, function () {
+      clearTimeout(to);
+      if (timedOut) throw new Error('Le serveur met trop de temps à répondre.');
+      throw new Error(App.native ? 'Le serveur ' + App.apiBase.replace(/^https?:\/\//, '') + ' ne répond pas.' : 'Pas de connexion internet. Vérifiez votre réseau et réessayez.'); });
   };
   App.get = function (u) { return App.api('GET', u); };
   App.post = function (u, b) { return App.api('POST', u, b || {}); };
