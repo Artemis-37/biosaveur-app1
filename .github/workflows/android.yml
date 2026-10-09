@@ -11,7 +11,7 @@ jobs:
   android:
     runs-on: ubuntu-latest
     env:
-      APP_API_URL: ${{ vars.APP_API_URL || 'https://biosaveur-app.onrender.com' }}
+      APP_API_URL: ${{ vars.APP_API_URL || 'https://biosaveur-molomolo.onrender.com' }}
       VERSION_CODE: ${{ github.run_number }}
       VERSION_NAME: 1.0.${{ github.run_number }}
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}

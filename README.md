@@ -47,7 +47,7 @@ Les applis mobiles reprennent la même interface, embarquée dans l'appli (Capac
 
 - Identifiant de l'appli : `ci.biosaveur.molomolo` · nom affiché : **BIOSAVEUR**
 - Fonctions natives : caméra (scan du QR par le livreur), localisation (position de livraison du client), ouverture de Google Maps / Waze, paiement CinetPay dans le navigateur du téléphone puis retour automatique dans l'appli, bouton retour Android.
-- Adresse du serveur utilisée par les applis : variable `APP_API_URL` (par défaut `https://biosaveur-app.onrender.com`). Si votre service Render a une autre adresse, définissez-la dans GitHub → **Settings → Secrets and variables → Actions → Variables** → `APP_API_URL`.
+- Adresse du serveur utilisée par les applis : variable `APP_API_URL` (par défaut `https://biosaveur-molomolo.onrender.com`). Si votre service Render a une autre adresse, définissez-la dans GitHub → **Settings → Secrets and variables → Actions → Variables** → `APP_API_URL`.
 
 ### Android
 

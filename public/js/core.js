@@ -71,6 +71,7 @@
   var ENV = window.BSV_ENV || {};
   App.native = !!ENV.native;
   App.apiBase = (ENV.apiBase || '').replace(/\/$/, '');
+  if (App.native) { try { var ov = localStorage.getItem('bsv-server'); if (ov) App.apiBase = JSON.parse(ov); } catch (e) { /* rien */ } }
   App.token = function (t) {
     if (t === undefined) return App.store.get('token', null);
     App.store.set('token', t);
@@ -89,7 +90,7 @@
         }
         return j;
       });
-    }, function () { throw new Error('Pas de connexion internet. Vérifiez votre réseau et réessayez.'); });
+    }, function () { throw new Error(App.native ? 'Le serveur ' + App.apiBase.replace(/^https?:\/\//, '') + ' ne répond pas.' : 'Pas de connexion internet. Vérifiez votre réseau et réessayez.'); });
   };
   App.get = function (u) { return App.api('GET', u); };
   App.post = function (u, b) { return App.api('POST', u, b || {}); };
@@ -196,9 +197,16 @@
   App.loadConfig = function () { return App.get('/config').then(function (c) { App.cfg = c; }); };
   App.start = function () {
     App.loadConfig().then(App.render, function (e) {
-      document.getElementById('app').innerHTML = '<div class="wrap"><div class="card empty" style="margin-top:40px"><span class="o">' + App.ic('truck', 'l') + '</span><strong>Connexion au service impossible</strong><span class="muted small">' + App.esc(e.message) + ' Le serveur peut mettre jusqu’à une minute à se réveiller.</span><button class="btn p" onclick="location.reload()">Réessayer</button></div></div>';
+      document.getElementById('app').innerHTML = '<div class="wrap"><div class="card empty" style="margin-top:40px"><span class="o">' + App.ic('truck', 'l') + '</span><strong>Connexion au service impossible</strong><span class="muted small">' + App.esc(e.message) + ' Le serveur peut mettre jusqu’à une minute à se réveiller.</span><button class="btn p" onclick="location.reload()">Réessayer</button>' +
+        (App.native ? '<form class="stack" style="gap:8px;width:100%;max-width:420px;margin-top:12px" data-form="server"><label class="small" for="srv" style="font-weight:600">Adresse du serveur</label><input id="srv" name="u" value="' + App.esc(App.apiBase) + '" inputmode="url" autocapitalize="off" style="min-height:44px;border:1.5px solid #c9d3cf;border-radius:8px;padding:0 10px"><button class="btn o sm" type="submit">Enregistrer et réessayer</button></form>' : '') +
+        '</div></div>';
     });
     setInterval(function () { if (App.cfg.user && document.visibilityState === 'visible') App.refreshBadges(); }, 60000);
+  };
+  App.F.server = function (fd) {
+    var u = String(fd.get('u') || '').trim().replace(/\/$/, '');
+    if (!/^https?:\/\/[^\s]+$/.test(u)) { App.toast('Adresse invalide. Exemple : https://biosaveur-molomolo.onrender.com'); return; }
+    App.store.set('server', u); location.reload();
   };
   App.badges = { notifications: 0, messages: 0 };
   App.refreshBadges = function () {

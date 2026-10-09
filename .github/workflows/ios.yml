@@ -9,7 +9,7 @@ jobs:
   ios:
     runs-on: macos-14
     env:
-      APP_API_URL: ${{ vars.APP_API_URL || 'https://biosaveur-app.onrender.com' }}
+      APP_API_URL: ${{ vars.APP_API_URL || 'https://biosaveur-molomolo.onrender.com' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
