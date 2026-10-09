@@ -33,13 +33,13 @@ Tests : `DATABASE_URL=postgres://…/biosaveur_test npm test`
 
 ## Déployer sur Render
 
-1. Sur [render.com](https://render.com) : **New → Blueprint**, choisir ce dépôt. Render lit `render.yaml` et crée le service web et la base PostgreSQL.
-2. Renseigner `ADMIN_PHONE` et `ADMIN_PASSWORD` : ce sera votre compte administrateur.
+1. Créer la base de données gratuite sur [Neon](https://console.neon.tech) (région Europe, Frankfurt) et copier son adresse de connexion (`postgresql://…?sslmode=require`). Render n'autorise qu'une base gratuite par compte.
+2. Sur [render.com](https://render.com) : **New → Blueprint**, choisir ce dépôt. Renseigner `DATABASE_URL` (adresse Neon), `ADMIN_PHONE` et `ADMIN_PASSWORD` (votre compte administrateur).
 3. Après le déploiement, connectez-vous avec ce compte, puis créez les comptes livreurs dans **Admin → Équipe**.
 4. Dans **Admin → Produits & stock**, mettez vos vrais prix, stocks, photos (lien https) et informations de traçabilité.
 5. Réglez `DEPOT_LAT` / `DEPOT_LNG` sur la position réelle de l'entrepôt (départ des tournées).
 
-> La base PostgreSQL gratuite de Render est limitée dans le temps. Pour la production, passez la base sur une offre payante afin de ne pas perdre de données.
+> L'offre gratuite de Neon suffit pour démarrer. Pensez à activer les sauvegardes ou une offre payante quand l'activité grandit.
 
 ## Applis Android et iOS
 

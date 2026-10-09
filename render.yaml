@@ -1,9 +1,6 @@
 # Déploiement Render (Blueprint) : Dashboard Render > New > Blueprint > choisir ce dépôt.
-databases:
-  - name: biosaveur-molomolo-db
-    databaseName: biosaveur
-    user: biosaveur
-    plan: free
+# La base PostgreSQL est externe (Neon, gratuite et sans limite de durée) :
+# Render n'autorise qu'une seule base gratuite par compte, déjà utilisée par l'ancienne application.
 
 services:
   - type: web
@@ -17,12 +14,11 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Adresse de connexion Neon (postgresql://…neon.tech/…?sslmode=require)
       - key: DATABASE_URL
-        fromDatabase:
-          name: biosaveur-molomolo-db
-          property: connectionString
+        sync: false
       - key: DATABASE_SSL
-        value: "false"
+        value: "true"
       - key: JWT_SECRET
         generateValue: true
       # Compte administrateur créé au premier démarrage
