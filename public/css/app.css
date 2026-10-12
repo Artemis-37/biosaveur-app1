@@ -390,3 +390,8 @@ html.native body{padding-top:env(safe-area-inset-top,0px);-webkit-tap-highlight-
 html.native input,html.native textarea,html.native [style*="user-select:all"],html.native code{-webkit-user-select:text;user-select:text}
 html.native .ch{top:env(safe-area-inset-top,0px)}
 html.native footer.cf{display:none}
+/* iPhone : site ajouté à l'écran d'accueil (plein écran) */
+@media (display-mode: standalone){
+  body{padding-top:env(safe-area-inset-top,0px)}
+  .ch{top:env(safe-area-inset-top,0px)}
+}

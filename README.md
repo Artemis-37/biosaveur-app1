@@ -60,15 +60,22 @@ Les applis mobiles reprennent la même interface, embarquée dans l'appli (Capac
   Puis ajouter dans GitHub → **Settings → Secrets → Actions** : `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` (`biosaveur`), `ANDROID_KEY_PASSWORD`. La compilation suivante produit le fichier `.aab` à envoyer sur la [Play Console](https://play.google.com/console) (compte développeur Google : 25 $ une fois).
 - En local : `npm run app:android` ouvre le projet dans Android Studio ; `npm run app:apk` compile un APK.
 
-### iOS
+### iOS (iPhone)
 
-Apple impose un Mac avec Xcode et un compte Apple Developer (99 $/an) pour publier.
+**Tout de suite, sans App Store** : sur l'iPhone, ouvrir le site dans **Safari**, toucher **Partager** puis **Sur l'écran d'accueil**. BIOSAVEUR s'ouvre alors en plein écran avec son icône, comme une appli.
 
-1. Sur un Mac : `npm install` puis `npm run app:ios` (ouvre Xcode).
-2. Dans Xcode : **Signing & Capabilities** → choisir votre équipe Apple, puis **Product → Archive** → **Distribute App** → App Store Connect.
-3. Sur [App Store Connect](https://appstoreconnect.apple.com) : fiche de l'appli, captures d'écran, puis envoi en vérification (TestFlight possible avant).
+**Appli App Store, sans Mac** (compte [Apple Developer](https://developer.apple.com/programs/) requis, 99 $/an) :
 
-Le workflow GitHub **Appli iOS** (à lancer depuis l'onglet Actions) vérifie que le projet iOS compile sur un Mac fourni par GitHub.
+1. Sur [App Store Connect](https://appstoreconnect.apple.com) → **Apps → +** : créer l'appli avec l'identifiant `ci.biosaveur.molomolo` (à enregistrer d'abord dans **Certificates, Identifiers & Profiles → Identifiers**).
+2. **Users and Access → Integrations → App Store Connect API** : créer une clé avec le rôle **Admin**, télécharger le fichier `AuthKey_XXXX.p8`, noter le **Key ID** et l'**Issuer ID**.
+3. Dans GitHub → **Settings → Secrets and variables → Actions**, ajouter :
+   - `APPLE_TEAM_ID` : identifiant d'équipe (developer.apple.com → Membership)
+   - `ASC_KEY_ID`, `ASC_ISSUER_ID`
+   - `ASC_KEY_P8_BASE64` : le fichier .p8 encodé (`base64 -i AuthKey_XXXX.p8` sur Mac/Linux, ou `certutil -encode` sous Windows en retirant les lignes BEGIN/END)
+4. Onglet **Actions → Appli iOS — TestFlight → Run workflow**. Un Mac fourni par GitHub compile, signe et envoie l'appli. Elle apparaît dans **TestFlight** environ 15 minutes après.
+5. Installer **TestFlight** sur l'iPhone pour la tester, puis soumettre à la vérification d'Apple depuis App Store Connect (captures d'écran, description, politique de confidentialité).
+
+Avec un Mac : `npm install` puis `npm run app:ios` ouvre le projet dans Xcode.
 
 ### Mettre à jour les applis
 
