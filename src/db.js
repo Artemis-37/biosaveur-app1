@@ -7,11 +7,30 @@ const config = require('./config');
 // DATE -> chaîne 'AAAA-MM-JJ' (pas de décalage de fuseau)
 types.setTypeParser(1082, (v) => v);
 
+// Les adresses Neon contiennent ?sslmode=require&channel_binding=require : on retire ces
+// paramètres (gérés ci-dessous) pour éviter les conflits avec l'option ssl du pilote.
+function cleanUrl(raw) {
+  const s = String(raw || '').trim().replace(/^['"]|['"]$/g, '');
+  try {
+    const u = new URL(s);
+    const needSsl = ['require', 'verify-ca', 'verify-full'].includes(u.searchParams.get('sslmode'));
+    ['sslmode', 'channel_binding', 'sslrootcert'].forEach((k) => u.searchParams.delete(k));
+    return { url: u.toString(), needSsl, host: u.hostname };
+  } catch (_) {
+    return { url: s, needSsl: false, host: '' };
+  }
+}
+const conn = cleanUrl(config.databaseUrl);
+
 const pool = new Pool({
-  connectionString: config.databaseUrl,
-  ssl: config.databaseSsl ? { rejectUnauthorized: false } : false,
+  connectionString: conn.url,
+  ssl: config.databaseSsl || conn.needSsl ? { rejectUnauthorized: false } : false,
   max: 10,
+  connectionTimeoutMillis: 15000,
+  idleTimeoutMillis: 30000,
 });
+// une coupure réseau ne doit pas arrêter le serveur
+pool.on('error', (e) => console.error('[db] connexion perdue :', e.message));
 
 function query(text, params) {
   return pool.query(text, params);
@@ -60,4 +79,4 @@ async function setSetting(key, value) {
   );
 }
 
-module.exports = { pool, query, one, many, tx, migrate, getSetting, setSetting };
+module.exports = { dbHost: conn.host, pool, query, one, many, tx, migrate, getSetting, setSetting };

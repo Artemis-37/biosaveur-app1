@@ -47,7 +47,14 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-app.get('/api/health', (req, res) => res.json({ ok: true }));
+// État du service : toujours 200 pour Render, avec l'état de la base pour le diagnostic.
+const status = { started: false, db: 'démarrage', error: null, since: new Date().toISOString() };
+app.get('/api/health', (req, res) => res.json({ ok: status.db === 'ok', db: status.db, error: status.error, dbHost: db.dbHost, since: status.since }));
+// Tant que la base n'est pas prête, l'API répond 503 avec un message clair.
+app.use('/api', (req, res, next) => {
+  if (!status.started || status.db === 'ok') return next();
+  res.status(503).json({ error: 'Le service démarre, réessayez dans un instant.' });
+});
 app.use('/api', require('./routes/public').router);
 app.use('/api/client', require('./routes/client'));
 app.use('/api/driver', require('./routes/driver'));
@@ -67,13 +74,27 @@ app.use((err, req, res, next) => {
   res.status(status).json({ error: status >= 500 ? 'Erreur interne. Réessayez dans un instant.' : err.message });
 });
 
+async function prepareDb(attempt = 1) {
+  try {
+    await db.migrate();
+    await seed();
+    status.db = 'ok';
+    status.error = null;
+    console.log('[db] base prête');
+  } catch (e) {
+    status.db = 'erreur';
+    status.error = `${e.code || ''} ${e.message}`.trim();
+    console.error(`[db] tentative ${attempt} échouée : ${status.error}`);
+    setTimeout(() => prepareDb(attempt + 1), Math.min(60000, 5000 * attempt));
+  }
+}
+
 async function start() {
-  await db.migrate();
-  await seed();
+  status.started = true;
+  await new Promise((resolve) => app.listen(config.port, resolve));
+  console.log(`BIOSAVEUR Molo Molo en ligne sur le port ${config.port} — paiement : ${require('./cinetpay').mode()} — base : ${db.dbHost || 'non configurée'}`);
+  await prepareDb();
   setInterval(() => services.expireStalePayments().catch((e) => console.error('[expire]', e.message)), 10 * 60e3);
-  app.listen(config.port, () => {
-    console.log(`BIOSAVEUR Molo Molo en ligne sur le port ${config.port} — paiement : ${require('./cinetpay').mode()}`);
-  });
 }
 
 if (require.main === module) {
