@@ -17,7 +17,7 @@ function publicUser(u) {
   return {
     id: u.id, role: u.role, name: u.name, phone: u.phone, commune: u.commune, address: u.address,
     landmark: u.landmark, lat: u.lat, lng: u.lng, referral_code: u.referral_code, points: u.points,
-    created_at: u.created_at,
+    created_at: u.created_at, company: u.company || '',
   };
 }
 
@@ -35,6 +35,7 @@ r.get('/config', h(async (req, res) => {
     paymentMode: cinetpay.mode(),
     minAppVersion: config.minAppVersion,
     demo: config.seedDemo,
+    demoAccounts: config.seedDemo ? require('../seed').DEMO_ACCOUNTS.map((a) => ({ role: a.role, name: a.company || a.name, phone: a.phone, password: require('../seed').DEMO_PASSWORD })) : [],
   });
 }));
 
@@ -86,7 +87,7 @@ r.post('/auth/register', h(async (req, res) => {
 
   let referrer = null;
   if (ref) {
-    referrer = await db.one("SELECT id FROM users WHERE referral_code=$1 AND role='client'", [ref]);
+    referrer = await db.one("SELECT id, role FROM users WHERE referral_code=$1 AND role IN ('client','partenaire') AND active", [ref]);
     if (!referrer) throw bad('Code de parrainage inconnu.');
   }
   const u = await db.tx(async (c) => {
@@ -95,9 +96,11 @@ r.post('/auth/register', h(async (req, res) => {
        VALUES ('client',$1,$2,$3,$4,$5,$6,$7) RETURNING *`,
       [name, phone, await hash(password), commune, address, `BSV-${code(4)}`, referrer ? referrer.id : null]
     )).rows[0];
-    if (referrer) {
+    if (referrer && referrer.role === 'client') {
       await c.query('UPDATE users SET points = points + $2 WHERE id=$1', [referrer.id, config.shop.referralPoints]);
       await notify(referrer.id, `${name} s’est inscrit avec votre code : +${config.shop.referralPoints} points.`, c);
+    } else if (referrer) {
+      await notify(referrer.id, `Nouveau client apporté : ${name}. Vous toucherez une commission sur ses commandes livrées.`, c);
     }
     await notify(user.id, 'Bienvenue chez BIOSAVEUR ! Placez votre position sur la carte pour faciliter vos livraisons.', c);
     return user;

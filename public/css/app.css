@@ -395,3 +395,13 @@ html.native footer.cf{display:none}
   body{padding-top:env(safe-area-inset-top,0px)}
   .ch{top:env(safe-area-inset-top,0px)}
 }
+/* démo */
+.demobar{background:#2b1d5c;color:#fff;font-size:13px}
+.demobar .wrap{display:flex;align-items:center;gap:10px;padding-block:6px;flex-wrap:wrap}
+.demobar .wrap span{flex:1}
+.demobar button{border:1px solid rgba(255,255,255,.5);background:transparent;color:#fff;border-radius:6px;padding:4px 10px;font-size:12px;min-height:30px}
+.demo-roles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:6px}
+.demo-role{border:1.5px solid #c9d3cf;background:var(--surf);border-radius:10px;padding:10px;text-align:left;display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--gris)}
+.demo-role strong{color:var(--vf);font-size:14px}
+.demo-role code{font-size:11px;margin-top:4px}
+.demo-role:hover{border-color:var(--vf);background:var(--pale)}

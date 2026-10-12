@@ -4,7 +4,8 @@
   var App = window.App, ic = App.ic, esc = App.esc, fcfa = App.fcfa, M = App.map;
 
   var MENU = [['apercu', 'home', 'Vue d’ensemble'], ['commandes', 'truck', 'Commandes & livraisons'], ['clients', 'users', 'Clients'], ['cotisations', 'coin', 'Cotisations & versements'],
-    ['stock', 'box', 'Produits & stock'], ['messages', 'chat', 'Messagerie'], ['equipe', 'user', 'Équipe'], ['cinetpay', 'card', 'Paiement CinetPay'], ['journal', 'list', 'Journal']];
+    ['stock', 'box', 'Produits & stock'], ['appro', 'truck', 'Approvisionnement'], ['partenaires', 'users', 'Partenaires'], ['messages', 'chat', 'Messagerie'], ['equipe', 'user', 'Équipe'], ['cinetpay', 'card', 'Paiement CinetPay'], ['journal', 'list', 'Journal'], ['demo', 'list', 'Version démo']];
+  var ROLES = { admin: 'Administrateur', livreur: 'Livreur', fournisseur: 'Fournisseur', partenaire: 'Partenaire' };
   var AV = { filter: 'tous', day: App.iso(new Date()), status: '', thread: null, q: '' };
 
   function frame(cur, body, badges) {
@@ -166,8 +167,9 @@
   };
 
   S.stock = function () {
-    return App.get('/admin/products').then(function (list) {
-      AV.products = list;
+    return Promise.all([App.get('/admin/products'), App.get('/admin/staff')]).then(function (res) {
+      var list = res[0]; AV.products = list;
+      AV.suppliers = res[1].filter(function (u) { return u.role === 'fournisseur' && u.active; });
       return frame('stock', head('Produits & stock', list.length + ' produit(s)', '<button class="btn p sm" data-act="prodEdit">+ Nouveau produit</button>') +
         '<section class="card pad tbl"><table><thead><tr><th>Produit</th><th>Prix</th><th>Disponible</th><th>Seuil</th><th>Fournisseur</th><th>Délai</th><th>État</th><th></th></tr></thead><tbody>' +
         list.map(function (p) {
@@ -189,7 +191,8 @@
       '<div class="form-grid">' + f('price', 'Prix (FCFA)', 'number', ' min="0" required') + f('old_price', 'Ancien prix (barré)', 'number', ' min="0"') + '</div>' +
       '<div class="field"><label for="pe-opt">Présentations (séparées par des virgules)</label><input id="pe-opt" name="options" value="' + esc((p.options || []).join(', ')) + '"></div>' +
       '<div class="form-grid">' + f('stock', 'Stock', 'number', ' min="0"') + f('threshold', 'Seuil d’alerte', 'number', ' min="0"') + '</div>' +
-      '<div class="form-grid">' + f('supplier', 'Fournisseur') + f('lead_time', 'Délai d’approvisionnement') + '</div>' +
+      '<div class="form-grid">' + f('supplier', 'Fournisseur (nom affiché)') + f('lead_time', 'Délai d’approvisionnement') + '</div>' +
+      '<div class="field"><label for="pe-sid">Compte fournisseur lié</label><select id="pe-sid" name="supplier_id"><option value="">— aucun —</option>' + (AV.suppliers || []).map(function (u) { return '<option value="' + u.id + '"' + (p.supplier_id === u.id ? ' selected' : '') + '>' + esc(u.company || u.name) + '</option>'; }).join('') + '</select></div>' +
       '<div class="form-grid">' + f('tag', 'Étiquette (Halal, Promo…)') + f('image_url', 'Photo (lien https)') + '</div>' +
       '<div class="field"><label for="pe-desc">Description</label><textarea id="pe-desc" name="description">' + esc(p.description) + '</textarea></div>' +
       '<strong class="small" style="color:var(--vf)">Traçabilité</strong>' +
@@ -202,6 +205,7 @@
   };
   App.F.prodSave = function (fd, form) {
     var b = {}; fd.forEach(function (v, k) { b[k] = v; });
+    if (b.supplier_id === '') b.supplier_id = null;
     b.flash = !!fd.get('flash'); b.visible = !!fd.get('visible');
     var id = form.getAttribute('data-id');
     return (id ? App.put('/admin/products/' + id, b) : App.post('/admin/products', b)).then(function () { App.modal(null); App.toast('Produit enregistré.'); App.render(); });
@@ -229,14 +233,15 @@
 
   S.equipe = function () {
     return App.get('/admin/staff').then(function (list) {
-      return frame('equipe', head('Équipe', 'Comptes livreurs et administrateurs') +
+      return frame('equipe', head('Équipe', 'Livreurs, fournisseurs, partenaires et administrateurs') +
         '<section class="card pad tbl"><table><thead><tr><th>Nom</th><th>Rôle</th><th>Téléphone</th><th>Dernière activité</th><th>État</th><th></th></tr></thead><tbody>' +
-        list.map(function (u) { return '<tr><td><strong>' + esc(u.name) + '</strong></td><td>' + (u.role === 'admin' ? 'Administrateur' : 'Livreur') + '</td><td class="num">' + App.phone(u.phone) + '</td><td>' + App.ago(u.last_active) + '</td><td>' + (u.active ? '<span class="pill ok">Actif</span>' : '<span class="pill neutral">Désactivé</span>') + '</td><td><div class="row" style="gap:6px"><button class="btn o sm" data-act="staffPw" data-id="' + u.id + '">Mot de passe</button>' + (u.id !== App.cfg.user.id ? '<button class="btn o sm" data-act="staffActive" data-id="' + u.id + '" data-v="' + (u.active ? '0' : '1') + '">' + (u.active ? 'Désactiver' : 'Réactiver') + '</button>' : '') + '</div></td></tr>'; }).join('') +
+        list.map(function (u) { return '<tr><td><strong>' + esc(u.name) + '</strong></td><td>' + esc(ROLES[u.role] || u.role) + (u.company ? '<br><span class="xs muted">' + esc(u.company) + '</span>' : '') + '</td><td class="num">' + App.phone(u.phone) + '</td><td>' + App.ago(u.last_active) + '</td><td>' + (u.active ? '<span class="pill ok">Actif</span>' : '<span class="pill neutral">Désactivé</span>') + '</td><td><div class="row" style="gap:6px"><button class="btn o sm" data-act="staffPw" data-id="' + u.id + '">Mot de passe</button>' + (u.id !== App.cfg.user.id ? '<button class="btn o sm" data-act="staffActive" data-id="' + u.id + '" data-v="' + (u.active ? '0' : '1') + '">' + (u.active ? 'Désactiver' : 'Réactiver') + '</button>' : '') + '</div></td></tr>'; }).join('') +
         '</tbody></table></section>' +
         '<section class="card pad stack" style="gap:12px"><h2 class="sec-t" style="font-size:16px">Ajouter un membre</h2><form class="form-grid" data-form="staffAdd">' +
         '<div class="field"><label for="sn">Nom</label><input id="sn" name="name" required></div>' +
         '<div class="field"><label for="sp">Téléphone</label><input id="sp" name="phone" inputmode="tel" required></div>' +
-        '<div class="field"><label for="sr">Rôle</label><select id="sr" name="role"><option value="livreur">Livreur</option><option value="admin">Administrateur</option></select></div>' +
+        '<div class="field"><label for="sr">Rôle</label><select id="sr" name="role"><option value="livreur">Livreur</option><option value="fournisseur">Fournisseur</option><option value="partenaire">Partenaire</option><option value="admin">Administrateur</option></select></div>' +
+        '<div class="field"><label for="sc">Entreprise (fournisseur / partenaire)</label><input id="sc" name="company" maxlength="120"></div>' +
         '<div class="field"><label for="sw">Mot de passe provisoire</label><input id="sw" name="password" type="text" minlength="6" required></div>' +
         '<button class="btn p" type="submit" style="align-self:end">Créer le compte</button></form></section>');
     });
@@ -277,6 +282,68 @@
   App.A.cpToggle = function (d, el) { App.put('/admin/cinetpay', { enabled: el.checked }).then(function () { return App.loadConfig(); }).then(function () { App.toast(el.checked ? 'Paiement en ligne proposé aux clients.' : 'Paiement en ligne masqué.'); App.render(); }).catch(function (e) { App.err(e); App.render(); }); };
   App.A.cpTest = function () { App.post('/admin/cinetpay/test').then(function (r) { App.openPayment(r.payment_url, r.transaction_id); }).catch(App.err); };
   App.A.cpSync = function (d) { App.post('/admin/cinetpay/sync/' + encodeURIComponent(d.v)).then(function (r) { App.toast('État : ' + r.status); App.render(); }).catch(App.err); };
+
+
+  var SUP_ST = { demandee: ['warn', 'Demandée'], confirmee: ['ok', 'Confirmée'], livree: ['ok', 'Livrée'], refusee: ['err', 'Refusée'], annulee: ['neutral', 'Annulée'] };
+  S.appro = function () {
+    return Promise.all([App.get('/admin/supply'), App.get('/admin/products')]).then(function (res) {
+      var d = res[0]; AV.products = res[1]; AV.suppliers = d.suppliers;
+      return frame('appro', head('Approvisionnement', 'Commandes passées à vos fournisseurs', '<button class="btn p sm" data-act="supplyNew">+ Commander à un fournisseur</button>') +
+        '<section class="card pad tbl"><table><thead><tr><th>N°</th><th>Fournisseur</th><th>Produit</th><th>Qté</th><th>Pour le</th><th>État</th><th></th></tr></thead><tbody>' +
+        (d.orders.map(function (o) {
+          var st = SUP_ST[o.status] || ['neutral', o.status];
+          return '<tr><td class="num">' + esc(o.number) + '</td><td>' + esc(o.supplier_company || o.supplier_name) + '</td><td>' + esc(o.product_name) + (o.supplier_note ? '<br><span class="xs muted">' + esc(o.supplier_note) + '</span>' : '') + '</td><td class="num">' + o.qty + '</td><td class="small">' + esc(o.due_date ? String(o.due_date).slice(0, 10) : '—') + '</td><td><span class="pill ' + st[0] + '">' + st[1] + '</span></td><td>' + (o.status === 'demandee' || o.status === 'confirmee' ? '<button class="btn o sm" data-act="supplyCancel" data-id="' + o.id + '">Annuler</button>' : '') + '</td></tr>';
+        }).join('') || '<tr><td colspan="7" class="muted">Aucune commande.</td></tr>') + '</tbody></table></section>');
+    });
+  };
+  App.A.supplyNew = function () {
+    App.modal('<h2 class="sec-t">Commander à un fournisseur</h2><form class="stack" style="gap:12px" data-form="supplyNew">' +
+      '<div class="field"><label for="sp-p">Produit</label><select id="sp-p" name="product_id">' + (AV.products || []).map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + ' (stock ' + p.stock + ')</option>'; }).join('') + '</select></div>' +
+      '<div class="field"><label for="sp-s">Fournisseur</label><select id="sp-s" name="supplier_id">' + (AV.suppliers || []).map(function (u) { return '<option value="' + u.id + '">' + esc(u.company || u.name) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="form-grid"><div class="field"><label for="sp-q">Quantité</label><input id="sp-q" name="qty" type="number" min="1" required></div><div class="field"><label for="sp-c">Prix d’achat unitaire (FCFA)</label><input id="sp-c" name="unit_cost" type="number" min="0"></div></div>' +
+      '<div class="field"><label for="sp-d">Pour le</label><input id="sp-d" name="due_date" type="date"></div>' +
+      '<div class="field"><label for="sp-n">Note</label><input id="sp-n" name="note" maxlength="300"></div>' +
+      '<button class="btn p" type="submit">Envoyer la commande</button><button class="linkbtn" type="button" data-act="closeM">Annuler</button></form>');
+  };
+  App.F.supplyNew = function (fd) {
+    var b = {}; fd.forEach(function (v, k) { b[k] = v; });
+    return App.post('/admin/supply', b).then(function () { App.modal(null); App.toast('Commande envoyée au fournisseur.'); App.render(); });
+  };
+  App.A.supplyCancel = function (d) { App.put('/admin/supply/' + d.id + '/cancel', {}).then(function () { App.toast('Commande annulée.'); App.render(); }).catch(App.err); };
+
+  S.partenaires = function () {
+    return App.get('/admin/partners').then(function (list) {
+      return frame('partenaires', head('Partenaires', 'Clients apportés et commissions à verser') +
+        '<section class="card pad tbl"><table><thead><tr><th>Partenaire</th><th>Taux</th><th>Clients</th><th>Ventes livrées</th><th>Commission</th><th>Versé</th><th>Solde dû</th><th></th></tr></thead><tbody>' +
+        (list.map(function (s) {
+          return '<tr><td><strong>' + esc(s.partner.name) + '</strong><br><span class="xs muted">' + esc(s.partner.company || '') + '</span></td><td class="num">' + Math.round(s.partner.commission_rate * 1000) / 10 + ' %</td><td class="num">' + s.clients + '</td><td class="num">' + fcfa(s.ventes) + '</td><td class="num">' + fcfa(s.earned) + '</td><td class="num">' + fcfa(s.paid) + '</td><td class="num"><strong>' + fcfa(s.balance) + '</strong></td><td>' + (s.balance > 0 ? '<button class="btn p sm" data-act="payoutNew" data-id="' + s.partner.id + '" data-max="' + s.balance + '">Verser</button>' : '') + '</td></tr>';
+        }).join('') || '<tr><td colspan="8" class="muted">Aucun partenaire.</td></tr>') + '</tbody></table></section>');
+    });
+  };
+  App.A.payoutNew = function (d) {
+    App.modal('<h2 class="sec-t">Verser une commission</h2><form class="stack" style="gap:12px" data-form="payoutNew" data-id="' + d.id + '">' +
+      '<div class="field"><label for="po-a">Montant (FCFA) — solde dû ' + fcfa(+d.max) + '</label><input id="po-a" name="amount" type="number" min="1" max="' + d.max + '" value="' + d.max + '" required></div>' +
+      '<div class="field"><label for="po-m">Moyen</label><select id="po-m" name="method"><option>Mobile Money</option><option>Espèces</option><option>Virement</option></select></div>' +
+      '<button class="btn p" type="submit">Enregistrer le versement</button><button class="linkbtn" type="button" data-act="closeM">Annuler</button></form>');
+  };
+  App.F.payoutNew = function (fd, form) {
+    return App.post('/admin/partners/' + form.getAttribute('data-id') + '/payout', { amount: +fd.get('amount'), method: fd.get('method') }).then(function () { App.modal(null); App.toast('Versement enregistré. Le partenaire est prévenu.'); App.render(); });
+  };
+
+  S.demo = function () {
+    return App.get('/admin/demo').then(function (d) {
+      var accs = (App.cfg.demoAccounts || []);
+      return frame('demo', head('Version démo', 'Données fictives pour présenter l’application') +
+        '<section class="card pad stack" style="gap:10px"><p>' + (d.seedDemo ? 'Le mode démo est <strong>activé</strong> : ' + d.demoUsers + ' comptes fictifs, un historique de commandes, des cotisations, des approvisionnements et des commissions sont présents.' : 'Le mode démo est désactivé. ' + d.demoUsers + ' compte(s) fictif(s) restent dans la base.') + '</p>' +
+        (accs.length ? '<div class="tbl"><table><thead><tr><th>Rôle</th><th>Nom</th><th>Téléphone</th><th>Mot de passe</th></tr></thead><tbody>' + accs.map(function (a) { return '<tr><td>' + esc(ROLES[a.role] || 'Client') + '</td><td>' + esc(a.name) + '</td><td class="num">' + App.phone(a.phone) + '</td><td class="num">' + esc(a.password) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '') +
+        '<p class="small muted">Avant la mise en service réelle : retirez la variable SEED_DEMO sur Render, redéployez, puis supprimez les données fictives ci-dessous.</p>' +
+        '<button class="btn o" data-act="demoPurge"' + (d.seedDemo ? ' disabled' : '') + '>Supprimer toutes les données de démo</button></section>');
+    });
+  };
+  App.A.demoPurge = function () {
+    if (!window.confirm('Supprimer définitivement les comptes et données fictifs ?')) return;
+    App.post('/admin/demo/purge', {}).then(function (r) { App.toast(r.deleted + ' comptes supprimés.'); App.render(); }).catch(App.err);
+  };
 
   S.journal = function () {
     return App.get('/admin/audit').then(function (list) {

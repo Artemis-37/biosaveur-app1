@@ -5,7 +5,7 @@
 
   App.shells.staff = function () {
     var u = App.cfg.user;
-    document.getElementById('hdr').innerHTML = '<div class="staffbar"><div class="wrap"><span class="logo">biosaveur</span><span class="small">' + (u ? esc(u.name) + ' · ' + (u.role === 'admin' ? 'Administrateur' : 'Livreur') : '') + '</span><span class="sp"></span>' +
+    document.getElementById('hdr').innerHTML = '<div class="staffbar"><div class="wrap"><span class="logo">biosaveur</span><span class="small">' + (u ? esc(u.company || u.name) + ' · ' + esc(App.ROLE_LABEL[u.role] || u.role) : '') + '</span><span class="sp"></span>' +
       (u && u.role === 'admin' ? '<a href="#/admin">' + ic('grid', 's') + 'Admin</a><a href="#/livreur">' + ic('truck', 's') + 'Tournée</a>' : '') +
       '<a href="#/">' + ic('store', 's') + 'Boutique</a><button data-act="logout">' + ic('logout', 's') + 'Déconnexion</button></div></div>';
     document.getElementById('main').className = '';

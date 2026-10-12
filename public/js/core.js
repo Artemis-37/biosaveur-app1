@@ -126,6 +126,8 @@
   App.err = function (e) { App.toast(e && e.message ? e.message : String(e)); };
 
   /* ---------- routage ---------- */
+  App.ROLE_LABEL = { client: 'Client', livreur: 'Livreur', admin: 'Administrateur', fournisseur: 'Fournisseur', partenaire: 'Partenaire' };
+  App.homeOf = function (role) { return { livreur: '#/livreur', admin: '#/admin', fournisseur: '#/fournisseur', partenaire: '#/partenaire' }[role] || '#/'; };
   App.routes = {};
   App.route = function (name, fn) { App.routes[name] = fn; };
   App.go = function (hash) { if (location.hash === hash) App.render(); else location.hash = hash; };
@@ -145,8 +147,7 @@
     var u = App.cfg.user;
     // redirections selon le rôle
     if (!r.name) {
-      if (u && u.role === 'livreur') return App.go('#/livreur');
-      if (u && u.role === 'admin') return App.go('#/admin');
+      if (u && u.role !== 'client') return App.go(App.homeOf(u.role));
     }
     var fn = App.routes[r.name] || App.routes[''];
     var seq = ++renderSeq;

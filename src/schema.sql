@@ -2,7 +2,7 @@
 
 CREATE TABLE IF NOT EXISTS users (
   id            SERIAL PRIMARY KEY,
-  role          TEXT NOT NULL DEFAULT 'client' CHECK (role IN ('client','livreur','admin')),
+  role          TEXT NOT NULL DEFAULT 'client',
   name          TEXT NOT NULL,
   phone         TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
@@ -159,3 +159,44 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 
 CREATE SEQUENCE IF NOT EXISTS order_number_seq START 1001;
+
+-- ===== v2 : fournisseurs, partenaires, démonstration =====
+ALTER TABLE users ADD COLUMN IF NOT EXISTS demo BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS company TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS commission_rate NUMERIC(5,4) NOT NULL DEFAULT 0.05;
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('client','livreur','admin','fournisseur','partenaire'));
+
+ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+
+-- commandes d'approvisionnement passées par BIOSAVEUR aux fournisseurs
+CREATE TABLE IF NOT EXISTS supply_orders (
+  id           SERIAL PRIMARY KEY,
+  number       TEXT NOT NULL UNIQUE,
+  supplier_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  product_id   INTEGER REFERENCES products(id) ON DELETE SET NULL,
+  product_name TEXT NOT NULL,
+  qty          INTEGER NOT NULL CHECK (qty > 0),
+  unit_cost    INTEGER NOT NULL DEFAULT 0,
+  due_date     DATE,
+  status       TEXT NOT NULL DEFAULT 'demandee' CHECK (status IN ('demandee','confirmee','livree','refusee','annulee')),
+  note         TEXT NOT NULL DEFAULT '',
+  supplier_note TEXT NOT NULL DEFAULT '',
+  created_by   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  confirmed_at TIMESTAMPTZ,
+  delivered_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS supply_orders_supplier ON supply_orders(supplier_id);
+CREATE SEQUENCE IF NOT EXISTS supply_number_seq START 101;
+
+-- versements de commissions aux partenaires
+CREATE TABLE IF NOT EXISTS partner_payouts (
+  id          SERIAL PRIMARY KEY,
+  partner_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  amount      INTEGER NOT NULL CHECK (amount > 0),
+  method      TEXT NOT NULL DEFAULT 'Mobile Money',
+  note        TEXT NOT NULL DEFAULT '',
+  created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);

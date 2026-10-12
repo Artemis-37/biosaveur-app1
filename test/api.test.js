@@ -55,7 +55,7 @@ test('parcours complet : inscription, commande, préparation, remise par QR', as
   const qr = (await c('GET', `/client/orders/${order.id}`)).body.qr_code;
 
   const admin = agent();
-  await admin('POST', '/auth/login', { phone: '0700000000', password: 'admin1234' });
+  await admin('POST', '/auth/login', { phone: '0700000000', password: 'demo1234' });
   r = await admin('PUT', `/admin/orders/${order.id}/status`, { status: 'livree' });
   assert.equal(r.status, 400, 'transition interdite');
   r = await admin('PUT', `/admin/orders/${order.id}/status`, { status: 'preparee' });
@@ -117,7 +117,7 @@ test('cotisation : versements, complétion, livraison et renouvellement', async 
   assert.equal(r.status, 200);
   const cotId = r.body.id;
   const admin = agent();
-  await admin('POST', '/auth/login', { phone: '0700000000', password: 'admin1234' });
+  await admin('POST', '/auth/login', { phone: '0700000000', password: 'demo1234' });
   r = await admin('POST', `/admin/cotisations/${cotId}/payments`, { amount: 10000, method: 'Espèces' });
   assert.equal(r.status, 200);
   const cot = (await c('GET', '/client/cotisation')).body.cotisation;
@@ -138,4 +138,52 @@ test('accès protégés', async () => {
   assert.equal((await c('GET', '/driver/tour')).status, 403);
   const r = await fetch(`${base}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
   assert.equal(r.status, 403, 'requête sans en-tête anti-CSRF refusée');
+});
+
+test('fournisseur : approvisionnement demandé, confirmé, livré → stock augmenté', async () => {
+  const admin = agent();
+  await admin('POST', '/auth/login', { phone: '0700000000', password: 'demo1234' });
+  const sup = agent();
+  let r = await sup('POST', '/auth/login', { phone: '0700000003', password: 'demo1234' });
+  assert.equal(r.body.user.role, 'fournisseur');
+  const ov = (await sup('GET', '/supplier/overview')).body;
+  assert.ok(ov.products.length > 0, 'produits fournis');
+  const p = ov.products[0];
+  r = await admin('POST', '/admin/supply', { product_id: p.id, qty: 7, due_date: today });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const oid = r.body.id;
+  r = await sup('POST', `/supplier/orders/${oid}/deliver`);
+  assert.equal(r.status, 400, 'livraison avant confirmation refusée');
+  assert.equal((await sup('POST', `/supplier/orders/${oid}/confirm`, { due_date: today })).status, 200);
+  assert.equal((await sup('POST', `/supplier/orders/${oid}/deliver`)).status, 200);
+  const after = (await admin('GET', '/admin/products')).body.find((x) => x.id === p.id);
+  assert.equal(after.stock, p.stock + 7);
+  // un autre fournisseur ne voit pas cette commande
+  const sup2 = agent();
+  await sup2('POST', '/auth/login', { phone: '0700000013', password: 'demo1234' });
+  assert.equal((await sup2('POST', `/supplier/orders/${oid}/confirm`)).status, 404);
+});
+
+test('partenaire : clients apportés, commission et versement', async () => {
+  const par = agent();
+  let r = await par('POST', '/auth/login', { phone: '0700000004', password: 'demo1234' });
+  assert.equal(r.body.user.role, 'partenaire');
+  const ov = (await par('GET', '/partner/overview')).body;
+  assert.ok(ov.clients >= 3, 'clients apportés');
+  assert.equal(ov.earned, Math.round(ov.ventes * 0.05));
+  assert.match(ov.clientsList[0].name, /\s\S\.$/, 'nom de famille abrégé');
+  const admin = agent();
+  await admin('POST', '/auth/login', { phone: '0700000000', password: 'demo1234' });
+  r = await admin('POST', `/admin/partners/${ov.partner.id}/payout`, { amount: ov.balance + 1 });
+  assert.equal(r.status, 400, 'versement supérieur au solde refusé');
+  if (ov.balance > 0) {
+    r = await admin('POST', `/admin/partners/${ov.partner.id}/payout`, { amount: 1000 });
+    assert.equal(r.status, 200);
+    assert.equal((await par('GET', '/partner/overview')).body.paid, ov.paid + 1000);
+  }
+  // un client ne peut pas voir l'espace partenaire
+  const c = agent();
+  await c('POST', '/auth/login', { phone: '0700000001', password: 'demo1234' });
+  assert.equal((await c('GET', '/partner/overview')).status, 403);
+  assert.equal((await c('GET', '/supplier/overview')).status, 403);
 });

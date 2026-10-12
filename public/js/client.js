@@ -49,11 +49,15 @@
     }
     document.body.classList.toggle('has-bnav', shell === 'client');
     App.shells[shell](r);
+    if (App.cfg.demo) {
+      var u = App.cfg.user;
+      document.getElementById('hdr').insertAdjacentHTML('afterbegin', '<div class="demobar"><div class="wrap"><span><strong>Démo</strong> · données fictives' + (u ? ' · connecté en ' + esc(App.ROLE_LABEL[u.role] || u.role) : '') + '</span><button data-act="demoSwitch">Changer de rôle</button></div></div>');
+    }
   };
   App.shells.client = function (r) {
     var u = App.cfg.user;
     var n = Cart.count(), nb = App.badges.notifications + App.badges.messages;
-    var staff = u && u.role !== 'client' ? '<div class="staffbar"><div class="wrap"><span class="small">Connecté en tant que ' + esc(u.name) + '</span><span class="sp"></span><a href="#/' + (u.role === 'admin' ? 'admin' : 'livreur') + '">' + ic(u.role === 'admin' ? 'grid' : 'truck', 's') + 'Retour à mon espace</a></div></div>' : '';
+    var staff = u && u.role !== 'client' ? '<div class="staffbar"><div class="wrap"><span class="small">Connecté en tant que ' + esc(u.name) + '</span><span class="sp"></span><a href="' + App.homeOf(u.role) + '">' + ic('grid', 's') + 'Retour à mon espace</a></div></div>' : '';
     document.getElementById('hdr').innerHTML = staff +
       '<header class="ch"><div class="wrap">' +
       '<a class="logo" href="#/" aria-label="BIOSAVEUR, accueil" style="text-decoration:none">biosaveur</a>' +
@@ -312,6 +316,10 @@
   }
   function shell(cur, inner) { return '<div class="acc">' + accNav(cur) + '<div class="accm">' + inner + '</div></div>'; }
   App.accShell = shell;
+  App.A.demoSwitch = function () {
+    var go = function () { App.token(null); App.cfg.user = null; App.go('#/connexion'); };
+    App.post('/auth/logout').then(go, go);
+  };
   App.A.logout = function () {
     var done = function () { App.token(null); App.cfg.user = null; App.go('#/'); App.toast('Vous êtes déconnecté.'); };
     App.post('/auth/logout').then(done, done);
@@ -330,7 +338,7 @@
   App.route('compte', function () {
     needLogin();
     var u = App.cfg.user;
-    if (u.role !== 'client') return App.go('#/' + (u.role === 'admin' ? 'admin' : 'livreur'));
+    if (u.role !== 'client') return App.go(App.homeOf(u.role));
     return Promise.all([App.get('/client/orders'), App.get('/client/notifications')]).then(function (res) {
       var cur = res[0].filter(function (o) { return ['confirmee', 'preparee', 'en_route'].indexOf(o.status) >= 0; })[0];
       var notifs = res[1], nn = notifs.filter(function (n) { return !n.read; }).length;
@@ -497,7 +505,10 @@
   /* ---------- connexion / inscription ---------- */
   function authPage(mode, r) {
     if (App.cfg.user) { App.go(r.q.suite || '#/'); return; }
-    var demo = App.cfg.demo ? '<div class="card pad demo-acc"><strong style="color:var(--vf)">Comptes de démonstration</strong><span>Client : <code>07 00 00 00 01</code> / <code>demo1234</code></span><span>Livreur : <code>07 00 00 00 02</code> / <code>demo1234</code></span><span>Admin : <code>07 00 00 00 00</code> / <code>admin1234</code></span></div>' : '';
+    var demo = App.cfg.demo && (App.cfg.demoAccounts || []).length ? '<div class="card pad demo-acc"><strong style="color:var(--vf);font-size:15px">Essayer la démo</strong><span>Données fictives. Touchez un rôle pour entrer directement.</span>' +
+      '<div class="demo-roles">' + App.cfg.demoAccounts.map(function (a) {
+        return '<button class="demo-role" data-act="demoLogin" data-phone="' + esc(a.phone) + '" data-pw="' + esc(a.password) + '"><strong>' + esc(App.ROLE_LABEL[a.role]) + '</strong><span>' + esc(a.name) + '</span><code>' + App.phone(a.phone) + ' · ' + esc(a.password) + '</code></button>';
+      }).join('') + '</div></div>' : '';
     var suite = esc(r.q.suite || '');
     var body = mode === 'login'
       ? '<form class="stack" style="gap:12px" data-form="login" data-suite="' + suite + '"><div class="field"><label for="lp">Numéro de téléphone</label><input id="lp" name="phone" inputmode="tel" autocomplete="tel" placeholder="07 00 00 00 00" required></div>' +
@@ -513,13 +524,19 @@
     return '<div class="auth"><div class="card"><div class="tabs2"><button data-act="nav" data-h="#/connexion' + (suite ? '?suite=' + encodeURIComponent(r.q.suite) : '') + '" aria-pressed="' + (mode === 'login') + '">Se connecter</button><button data-act="nav" data-h="#/inscription' + (suite ? '?suite=' + encodeURIComponent(r.q.suite) : '') + '" aria-pressed="' + (mode !== 'login') + '">Créer un compte</button></div>' +
       '<h1>' + (mode === 'login' ? 'Bon retour !' : 'Bienvenue chez BIOSAVEUR') + '</h1>' + body + '</div>' + demo + '</div>';
   }
+  App.A.demoLogin = function (d) {
+    App.post('/auth/login', { phone: d.phone, password: d.pw }).then(function (r) {
+      App.token(r.token); App.cfg.user = r.user;
+      App.loadConfig().then(function () { App.go(App.homeOf(r.user.role)); App.toast('Connecté : ' + App.ROLE_LABEL[r.user.role] + ' (démo)'); });
+    }).catch(App.err);
+  };
   App.route('connexion', function (r) { return authPage('login', r); });
   App.route('inscription', function (r) { return authPage('register', r); });
   function afterAuth(u, form, token) {
     if (token) App.token(token);
     App.cfg.user = u;
     var s = form.getAttribute('data-suite');
-    App.loadConfig().then(function () { App.go(s || (u.role === 'livreur' ? '#/livreur' : u.role === 'admin' ? '#/admin' : '#/')); });
+    App.loadConfig().then(function () { App.go(s || App.homeOf(u.role)); });
   }
   App.F.login = function (fd, form) { return App.post('/auth/login', { phone: fd.get('phone'), password: fd.get('password') }).then(function (r) { afterAuth(r.user, form, r.token); }); };
   App.F.register = function (fd, form) {

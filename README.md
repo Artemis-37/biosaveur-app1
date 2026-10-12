@@ -25,9 +25,13 @@ La base est créée automatiquement au démarrage. Avec `SEED_DEMO=true`, des co
 
 | Rôle | Téléphone | Mot de passe |
 |---|---|---|
+| Administrateur | 07 00 00 00 00 | demo1234 |
 | Client | 07 00 00 00 01 | demo1234 |
-| Livreur | 07 00 00 00 02 | demo1234 |
-| Admin | 07 00 00 00 00 | admin1234 (si `ADMIN_PHONE` n'est pas défini) |
+| Livreur | 07 00 00 00 02 (et 07 00 00 00 12) | demo1234 |
+| Fournisseur | 07 00 00 00 03 (et 07 00 00 00 13) | demo1234 |
+| Partenaire | 07 00 00 00 04 (et 07 00 00 00 14) | demo1234 |
+
+La page de connexion affiche alors des boutons « Essayer la démo » (un par rôle). Avant la mise en service réelle : retirer `SEED_DEMO`, redéployer, puis **Admin → Version démo → Supprimer les données de démo**.
 
 Tests : `DATABASE_URL=postgres://…/biosaveur_test npm test`
 

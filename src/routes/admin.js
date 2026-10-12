@@ -80,17 +80,18 @@ r.put('/users/:id/active', h(async (req, res) => {
 
 // --- équipe (livreurs, admins) ---
 r.get('/staff', h(async (req, res) => {
-  res.json(await db.many("SELECT id,role,name,phone,active,created_at,last_active FROM users WHERE role IN ('livreur','admin') ORDER BY role, name"));
+  res.json(await db.many("SELECT id,role,name,company,phone,active,created_at,last_active,commission_rate FROM users WHERE role IN ('livreur','admin','fournisseur','partenaire') ORDER BY role, name"));
 }));
 
 r.post('/staff', h(async (req, res) => {
-  const role = req.body.role === 'admin' ? 'admin' : 'livreur';
+  const role = ['admin', 'livreur', 'fournisseur', 'partenaire'].includes(req.body.role) ? req.body.role : 'livreur';
   const name = str(req.body.name, 80);
   const phone = normPhone(req.body.phone);
   const password = String(req.body.password || '');
   if (name.length < 2 || !/^\d{10}$/.test(phone) || password.length < 6) throw bad('Nom, téléphone (10 chiffres) et mot de passe (6 caractères min.) sont obligatoires.');
   if (await db.one('SELECT 1 FROM users WHERE phone=$1', [phone])) throw bad('Ce numéro a déjà un compte.');
   const id = await ensureUser({ role, name, phone, password });
+  if (req.body.company) await db.query('UPDATE users SET company=$2 WHERE id=$1', [id, str(req.body.company, 120)]);
   await audit(req.user.id, 'compte équipe créé', `${role} ${phone}`);
   res.json({ id });
 }));
@@ -98,7 +99,7 @@ r.post('/staff', h(async (req, res) => {
 r.put('/staff/:id/password', h(async (req, res) => {
   const pw = String(req.body.password || '');
   if (pw.length < 6) throw bad('Mot de passe trop court.');
-  await db.query("UPDATE users SET password_hash=$2 WHERE id=$1 AND role IN ('livreur','admin')", [int(req.params.id), await hash(pw)]);
+  await db.query("UPDATE users SET password_hash=$2 WHERE id=$1 AND role IN ('livreur','admin','fournisseur','partenaire')", [int(req.params.id), await hash(pw)]);
   res.json({ ok: true });
 }));
 
@@ -194,9 +195,10 @@ function productFields(b, cur = {}) {
     cold_chain: pick('cold_chain', (v) => str(v, 120)),
     halal: pick('halal', (v) => str(v, 200)),
     visible: pick('visible', (v) => !!v),
+    supplier_id: pick('supplier_id', (v) => (int(v) > 0 ? int(v) : null)),
   };
 }
-const PCOLS = ['name', 'category', 'price', 'old_price', 'weight', 'options', 'tag', 'flash', 'image_url', 'description', 'stock', 'threshold', 'supplier', 'lead_time', 'lot_code', 'farm', 'feed', 'vet', 'slaughter_date', 'cold_chain', 'halal', 'visible'];
+const PCOLS = ['name', 'category', 'price', 'old_price', 'weight', 'options', 'tag', 'flash', 'image_url', 'description', 'stock', 'threshold', 'supplier', 'lead_time', 'lot_code', 'farm', 'feed', 'vet', 'slaughter_date', 'cold_chain', 'halal', 'visible', 'supplier_id'];
 
 r.post('/products', h(async (req, res) => {
   const f = productFields(req.body, { visible: true, flash: false, options: ['Entier'] });
@@ -276,6 +278,88 @@ r.post('/cinetpay/sync/:tx', h(async (req, res) => {
 
 r.get('/audit', h(async (req, res) => {
   res.json(await db.many(`SELECT a.created_at, a.action, a.detail, u.name FROM audit_log a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.id DESC LIMIT 200`));
+}));
+
+// --- approvisionnement fournisseurs ---
+r.get('/supply', h(async (req, res) => {
+  const [orders, suppliers] = await Promise.all([
+    db.many(`SELECT s.*, u.name AS supplier_name, u.company AS supplier_company FROM supply_orders s JOIN users u ON u.id=s.supplier_id
+      ORDER BY (s.status IN ('demandee','confirmee')) DESC, s.created_at DESC LIMIT 200`),
+    db.many("SELECT id, name, company, phone, active FROM users WHERE role='fournisseur' ORDER BY company, name"),
+  ]);
+  res.json({ orders, suppliers });
+}));
+
+r.post('/supply', h(async (req, res) => {
+  const p = await db.one('SELECT * FROM products WHERE id=$1', [int(req.body.product_id)]);
+  if (!p) throw bad('Produit introuvable.');
+  const sid = int(req.body.supplier_id) || p.supplier_id;
+  if (!sid || !(await db.one("SELECT 1 FROM users WHERE id=$1 AND role='fournisseur'", [sid]))) throw bad('Choisissez un fournisseur.');
+  const qty = int(req.body.qty);
+  if (qty <= 0 || qty > 100000) throw bad('Quantité invalide.');
+  const due = /^\d{4}-\d{2}-\d{2}$/.test(req.body.due_date || '') ? req.body.due_date : null;
+  const num = await db.one("SELECT 'APP-' || nextval('supply_number_seq') AS n");
+  const o = await db.one(`INSERT INTO supply_orders(number,supplier_id,product_id,product_name,qty,unit_cost,due_date,note,created_by)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+    [num.n, sid, p.id, p.name, qty, Math.max(0, int(req.body.unit_cost)), due, str(req.body.note, 300), req.user.id]);
+  await notify(sid, `Nouvelle commande d’approvisionnement ${o.number} : ${qty} × ${p.name}${due ? ` pour le ${due}` : ''}.`);
+  await audit(req.user.id, 'approvisionnement demandé', `${o.number} · ${qty} × ${p.name}`);
+  res.json(o);
+}));
+
+r.put('/supply/:id/cancel', h(async (req, res) => {
+  const o = await db.one('SELECT * FROM supply_orders WHERE id=$1', [int(req.params.id)]);
+  if (!o || !['demandee', 'confirmee'].includes(o.status)) throw bad('Commande non annulable.');
+  await db.query("UPDATE supply_orders SET status='annulee' WHERE id=$1", [o.id]);
+  await notify(o.supplier_id, `Commande ${o.number} annulée par BIOSAVEUR.`);
+  res.json({ ok: true });
+}));
+
+// --- partenaires ---
+const { partnerStats } = require('./partner');
+r.get('/partners', h(async (req, res) => {
+  const list = await db.many("SELECT id FROM users WHERE role='partenaire' ORDER BY name");
+  const out = [];
+  for (const p of list) out.push(await partnerStats(p.id));
+  res.json(out);
+}));
+
+r.post('/partners/:id/payout', h(async (req, res) => {
+  const pid = int(req.params.id);
+  const st = await partnerStats(pid);
+  if (!st) throw notFound('Partenaire introuvable.');
+  const amount = int(req.body.amount);
+  if (amount <= 0 || amount > st.balance) throw bad(`Montant invalide (solde dû : ${fcfa(st.balance)}).`);
+  const method = ['Mobile Money', 'Espèces', 'Virement'].includes(req.body.method) ? req.body.method : 'Mobile Money';
+  await db.query('INSERT INTO partner_payouts(partner_id,amount,method,note,created_by) VALUES ($1,$2,$3,$4,$5)', [pid, amount, method, str(req.body.note, 200), req.user.id]);
+  await notify(pid, `Commission versée : ${fcfa(amount)} (${method}).`);
+  await audit(req.user.id, 'commission versée', `${st.partner.name} · ${fcfa(amount)}`);
+  res.json({ ok: true });
+}));
+
+r.put('/partners/:id/rate', h(async (req, res) => {
+  const rate = Number(req.body.rate);
+  if (!(rate >= 0 && rate <= 0.5)) throw bad('Taux entre 0 et 50 %.');
+  await db.query("UPDATE users SET commission_rate=$2 WHERE id=$1 AND role='partenaire'", [int(req.params.id), rate]);
+  res.json({ ok: true });
+}));
+
+// --- démonstration ---
+r.get('/demo', h(async (req, res) => {
+  const n = await db.one('SELECT count(*)::int AS n FROM users WHERE demo');
+  res.json({ demoUsers: n.n, seedDemo: config.seedDemo });
+}));
+
+r.post('/demo/purge', h(async (req, res) => {
+  if (config.seedDemo) throw bad('Désactivez d’abord SEED_DEMO sur Render, sinon les données de démo seront recréées au prochain démarrage.');
+  const n = await db.tx(async (c) => {
+    await c.query('DELETE FROM supply_orders WHERE supplier_id IN (SELECT id FROM users WHERE demo)');
+    await c.query('UPDATE products SET supplier_id=NULL WHERE supplier_id IN (SELECT id FROM users WHERE demo)');
+    const d = await c.query('DELETE FROM users WHERE demo AND id <> $1', [req.user.id]);
+    return d.rowCount;
+  });
+  await audit(req.user.id, 'données de démonstration supprimées', `${n} comptes`);
+  res.json({ deleted: n });
 }));
 
 module.exports = r;
