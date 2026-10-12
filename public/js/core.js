@@ -213,7 +213,7 @@
   };
   App.F.server = function (fd) {
     var u = String(fd.get('u') || '').trim().replace(/\/$/, '');
-    if (!/^https?:\/\/[^\s]+$/.test(u)) { App.toast('Adresse invalide. Exemple : https://biosaveur-molomolo.onrender.com'); return; }
+    if (!/^https?:\/\/[^\s]+$/.test(u)) { App.toast('Adresse invalide. Exemple : https://biosaveur-molomolo-gvbm.onrender.com'); return; }
     App.store.set('server', u); location.reload();
   };
   App.badges = { notifications: 0, messages: 0 };

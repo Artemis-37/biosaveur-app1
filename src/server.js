@@ -75,6 +75,12 @@ app.use((err, req, res, next) => {
 });
 
 async function prepareDb(attempt = 1) {
+  if (db.dbInvalid) {
+    status.db = 'erreur';
+    status.error = 'DATABASE_URL invalide : elle doit contenir une adresse qui commence par postgresql://';
+    console.error(`[db] ${status.error}`);
+    return;
+  }
   try {
     await db.migrate();
     await seed();

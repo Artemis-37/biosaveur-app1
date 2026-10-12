@@ -10,7 +10,10 @@ types.setTypeParser(1082, (v) => v);
 // Les adresses Neon contiennent ?sslmode=require&channel_binding=require : on retire ces
 // paramètres (gérés ci-dessous) pour éviter les conflits avec l'option ssl du pilote.
 function cleanUrl(raw) {
-  const s = String(raw || '').trim().replace(/^['"]|['"]$/g, '');
+  // accepte aussi une commande copiée telle quelle depuis Neon : psql 'postgresql://…'
+  const found = String(raw || '').match(/postgres(?:ql)?:\/\/[^\s'"]+/);
+  if (!found) return { url: '', needSsl: false, host: '', invalid: true };
+  const s = found[0];
   try {
     const u = new URL(s);
     const needSsl = ['require', 'verify-ca', 'verify-full'].includes(u.searchParams.get('sslmode'));
@@ -79,4 +82,4 @@ async function setSetting(key, value) {
   );
 }
 
-module.exports = { dbHost: conn.host, pool, query, one, many, tx, migrate, getSetting, setSetting };
+module.exports = { dbHost: conn.host, dbInvalid: !!conn.invalid, pool, query, one, many, tx, migrate, getSetting, setSetting };
