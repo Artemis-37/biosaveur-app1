@@ -79,7 +79,7 @@
       '<div><strong>BIOSAVEUR</strong><br>AGRO VIVDURABLE SARL<br>Poulet halal et traçable, livré à Abidjan</div>' +
       '<div><strong>Mon compte</strong><button data-act="nav" data-h="#/cotisation">Ma cotisation</button><button data-act="nav" data-h="#/commandes">Mes commandes</button><button data-act="nav" data-h="#/parrainage">Parrainage</button></div>' +
       '<div><strong>Aide</strong><button data-act="nav" data-h="#/commandes">Suivre ma livraison</button><button data-act="nav" data-h="#/messages">Écrire à l’équipe</button></div>' +
-      '<div><strong>Paiement</strong><br>À la livraison, par cotisation' + (App.cfg.onlinePayment ? ' ou en ligne avec CinetPay (Orange Money, MTN Money, Moov Money, Wave, carte bancaire)' : '') + '</div>' +
+      '<div><strong>Paiement</strong><br>À la livraison, par cotisation' + (App.cfg.onlinePayment ? ' ou en ligne avec CinetPay (Orange Money, MTN MoMo, Moov Money, Wave, carte bancaire)' : '') + '</div>' +
       '</div></footer>' +
       '<nav class="bnav" aria-label="Navigation principale">' +
       b('#/', 'home', 'Accueil', ['', 'produit']) + b('#/cat', 'grid', 'Catégories', ['cat', 'recherche']) + b('#/cotisation', 'coin', 'Cotisation', ['cotisation']) +
@@ -273,7 +273,7 @@
         '<span style="font-weight:700">Créneau horaire</span><div class="slots">' + App.cfg.slots.map(function (s, i) { return '<button class="chip" data-act="setSlot" data-i="' + i + '" aria-pressed="' + (CV.slot === i) + '">' + s + '</button>'; }).join('') + '</div></section>' +
         '<section class="card pad" style="padding-bottom:4px"><h2 class="sec-t" style="font-size:17px;margin-bottom:8px">Paiement</h2>' +
         radio('livraison', 'Paiement à la livraison', 'Espèces au livreur', true) +
-        radio('cinetpay', 'Payer en ligne avec CinetPay', App.cfg.onlinePayment ? 'Orange Money, MTN Money, Moov Money, Wave ou carte bancaire — tout passe par CinetPay' : 'Bientôt disponible', App.cfg.onlinePayment) +
+        radio('cinetpay', 'Payer en ligne avec CinetPay', App.cfg.onlinePayment ? 'Orange Money, MTN MoMo, Moov Money, Wave ou carte bancaire — tout passe par CinetPay' : 'Bientôt disponible', App.cfg.onlinePayment) +
         radio('cotisation', 'Débiter ma cotisation', cot ? 'Solde : ' + fcfa(cot.paid) + (canCot ? '' : ' (insuffisant)') : 'Aucune cotisation en cours', !!canCot) +
         '</section></div>' +
         '<aside class="side sticky card pad stack" style="gap:6px"><h2 class="sec-t" style="font-size:17px;margin-bottom:6px">Récapitulatif</h2>' +
@@ -482,7 +482,7 @@
       var k = d.cotisation, rest = k.target - k.paid;
       App.modal('<h2 class="sec-t">Faire un versement</h2><span class="small muted">Reste à verser : ' + fcfa(rest) + '</span>' +
         '<form class="stack" style="gap:12px" data-form="vers"><div class="field"><label for="vm">Montant (FCFA)</label><input id="vm" name="m" type="number" min="500" step="5" max="' + rest + '" value="' + Math.min(5000, rest) + '" required></div>' +
-        '<div>' + (App.cfg.onlinePayment ? '<label class="radio"><input type="radio" name="moyen" value="cinetpay" checked><span class="t">Payer en ligne avec CinetPay<br><span class="xs muted">Orange Money, MTN Money, Moov Money, Wave ou carte — via CinetPay, crédité tout de suite</span></span></label>' : '') +
+        '<div>' + (App.cfg.onlinePayment ? '<label class="radio"><input type="radio" name="moyen" value="cinetpay" checked><span class="t">Payer en ligne avec CinetPay<br><span class="xs muted">Orange Money, MTN MoMo, Moov Money, Wave ou carte — via CinetPay, crédité tout de suite</span></span></label>' : '') +
         '<label class="radio"><input type="radio" name="moyen" value="especes"' + (App.cfg.onlinePayment ? '' : ' checked') + '><span class="t">Espèces au livreur ou en agence<br><span class="xs muted">Crédité quand l’équipe enregistre le versement</span></span></label></div>' +
         '<button class="btn p" type="submit">Continuer</button><button class="linkbtn" type="button" data-act="closeM">Annuler</button></form>');
     }).catch(App.err);
@@ -664,7 +664,7 @@
   });
 
   // Guichet simulé (tant que CinetPay n'est pas branché).
-  var OPS = [['ORANGE MONEY', 'Orange Money', '#ff7900'], ['MTN MOMO', 'MTN Money', '#ffcc00'], ['MOOV MONEY', 'Moov Money', '#0066b3'], ['WAVE', 'Wave', '#1dc8ff'], ['CARTE', 'Carte bancaire', '#1f3b8f']];
+  var OPS = [['ORANGE MONEY', 'Orange Money', '#ff7900'], ['MTN MOMO', 'MTN MoMo', '#ffcc00'], ['MOOV MONEY', 'Moov Money', '#0066b3'], ['WAVE', 'Wave', '#1dc8ff'], ['CARTE', 'Carte bancaire', '#1f3b8f']];
   var SIM = { op: 'ORANGE MONEY' };
   App.route('paiement-simule', function (r) {
     needLogin();
