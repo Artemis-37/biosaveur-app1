@@ -32,7 +32,7 @@
         kpi('Messages non lus', k.threads_non_lus) + kpi('Cotisations complètes', k.cot_completes) + kpi('Livraisons effectuées', k.livrees) + kpi('Ventes payées ce mois', fcfa(k.ventes_mois), true) + '</div>' +
         '<div class="grid2" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">' +
         '<section class="card pad stack chart" style="gap:10px"><div class="between"><h2 class="sec-t" style="font-size:16px">Évolution de la collecte par mois</h2><button class="linkbtn" data-act="objectif">' + (d.objectif ? 'Objectif : ' + fcfa(d.objectif) : 'Fixer un objectif') + '</button></div>' + chart(d.months, d.objectif) +
-        '<div class="legend"><span><i style="background:#103d3a"></i>Cotisations</span><span><i style="background:#25b810"></i>Ventes boutique</span>' + (d.objectif ? '<span><i style="background:#c08a00"></i>Objectif mensuel</span>' : '') + '</div></section>' +
+        '<div class="legend"><span><i style="background:#103d3a"></i>Cotisations</span><span><i style="background:#25b810"></i>Ventes</span>' + (d.objectif ? '<span><i style="background:#c08a00"></i>Objectif mensuel</span>' : '') + '</div></section>' +
         '<section class="card pad stack" style="gap:8px"><h2 class="sec-t" style="font-size:16px">À traiter</h2>' + (alerts || '<p class="muted small">Rien à signaler.</p>') + '</section></div>' +
         '<div class="grid2" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">' +
         '<section class="card pad stack chart" style="gap:10px"><h2 class="sec-t" style="font-size:16px">Statut des cotisations</h2>' + statusBars(d.cotStatus) + '</section>' +
@@ -94,7 +94,7 @@
     for (var v = 0; v <= top; v += step) s += '<line x1="' + l + '" x2="' + (W - r) + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="#e8edf0" stroke-width="1"/><text x="' + (l - 12) + '" y="' + (y(v) + 4) + '" text-anchor="end" font-size="12" fill="#5d6b66">' + num(v) + '</text>';
     months.forEach(function (x, i) { s += '<line x1="' + X(i) + '" x2="' + X(i) + '" y1="' + t + '" y2="' + y(0) + '" stroke="#eef2f4" stroke-width="1"/>'; });
     s += '<line x1="' + l + '" x2="' + l + '" y1="' + t + '" y2="' + y(0) + '" stroke="#dfe6ea"/>';
-    [['ventes', '#25b810', 'gv', 'Ventes boutique'], ['cotisations', '#103d3a', 'gc', 'Cotisations']].forEach(function (k) {
+    [['ventes', '#25b810', 'gv', 'Ventes'], ['cotisations', '#103d3a', 'gc', 'Cotisations']].forEach(function (k) {
       var pts = months.map(function (x, i) { return [X(i), y(x[k[0]])]; }), d = smooth(pts);
       s += '<path d="' + d + ' L' + X(months.length - 1) + ',' + y(0) + ' L' + X(0) + ',' + y(0) + ' Z" fill="url(#' + k[2] + ')"/>';
       s += '<path d="' + d + '" fill="none" stroke="' + k[1] + '" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>';
