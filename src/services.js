@@ -3,7 +3,7 @@
 const config = require('./config');
 const db = require('./db');
 const cinetpay = require('./cinetpay');
-const { bad, notFound, code, isoDate, addDays, nextWeekday, fcfa, notify, audit } = require('./util');
+const { bad, notFound, code, isoDate, addDays, nextWeekday, fcfa, notify, audit, securityAlert } = require('./util');
 
 const STATUS_LABEL = {
   attente_paiement: 'en attente de paiement', confirmee: 'confirmée', preparee: 'préparée',
@@ -33,8 +33,9 @@ function checkDelivery(day, slot, pre = false) {
  * Crée une commande boutique. Le stock est réservé immédiatement.
  * Renvoie { order, payment_url? }.
  */
-async function createOrder(user, { items, day, slot, pay_method }, fromApp = false) {
+async function createOrder(user, { items, day, slot, pay_method, expected_total }, fromApp = false) {
   if (!Array.isArray(items) || !items.length) throw bad('Votre panier est vide.');
+  if (items.some((it) => !it || typeof it !== 'object' || !Number.isInteger(Number(it.qty)) || Number(it.qty) < 1 || !Number.isInteger(Number(it.product_id)))) throw bad('Panier invalide.');
   if (items.length > 30) throw bad('Trop d’articles dans une même commande.');
   const pids = items.map((it) => parseInt(it.product_id, 10)).filter((n) => n > 0);
   const isPre = pids.length > 0 && !!(await db.one("SELECT 1 FROM products WHERE id = ANY($1) AND category='evenements'", [pids]));
@@ -42,6 +43,9 @@ async function createOrder(user, { items, day, slot, pay_method }, fromApp = fal
   if (!['livraison', 'cinetpay', 'cotisation'].includes(pay_method)) throw bad('Mode de paiement invalide.');
   if (!user.address || !user.commune) throw bad('Renseignez votre adresse de livraison dans votre profil.');
   if (pay_method === 'cinetpay' && !(await onlinePaymentEnabled())) throw bad('Le paiement en ligne n’est pas encore disponible. Choisissez le paiement à la livraison.');
+
+  const pending = await db.one("SELECT count(*)::int AS n FROM orders WHERE user_id=$1 AND status='attente_paiement'", [user.id]);
+  if (pending.n >= 3) throw bad('Vous avez déjà des paiements en attente. Terminez-les ou patientez quelques minutes.');
 
   const result = await db.tx(async (c) => {
     let subtotal = 0;
@@ -70,6 +74,15 @@ async function createOrder(user, { items, day, slot, pay_method }, fromApp = fal
     }
     const fee = config.shop.deliveryFee;
     const total = subtotal + fee;
+    // Le client affiche le total qu'il a vu. Un écart signifie : prix modifié depuis l'affichage, ou requête falsifiée
+    // (proxy d'interception). Dans tous les cas, rien n'est enregistré et l'équipe est alertée si le client a « vu » moins cher.
+    if (expected_total !== undefined && expected_total !== null && Number(expected_total) !== total) {
+      const seen = Number(expected_total);
+      if (Number.isFinite(seen) && seen < total) {
+        await securityAlert(user.id, `Écart de prix à la commande : ${user.name} (${user.phone}) annonçait ${fcfa(seen)}, le serveur calcule ${fcfa(total)}.`);
+      }
+      throw bad('Les prix ont changé depuis l’affichage de votre panier. Rechargez la page et vérifiez le total.');
+    }
 
     let paid = false;
     let status = 'confirmee';
@@ -109,6 +122,17 @@ async function createOrder(user, { items, day, slot, pay_method }, fromApp = fal
     }
   }
   return { order: result };
+}
+
+// Parrainage : les points ne sont versés qu'à la première livraison réelle du filleul (pas à l'inscription),
+// pour empêcher la création de faux comptes qui gonflent les points.
+async function rewardReferral(orderId, c) {
+  const u = (await c.query(`SELECT u.id, u.name, u.referred_by FROM users u JOIN orders o ON o.user_id=u.id
+    WHERE o.id=$1 AND u.referred_by IS NOT NULL AND NOT u.referral_rewarded FOR UPDATE OF u`, [orderId])).rows[0];
+  if (!u) return;
+  await c.query('UPDATE users SET referral_rewarded=true WHERE id=$1', [u.id]);
+  await c.query('UPDATE users SET points = points + $2 WHERE id=$1', [u.referred_by, config.shop.referralPoints]);
+  await notify(u.referred_by, `${u.name} a reçu sa première livraison : +${config.shop.referralPoints} points de parrainage.`, c);
 }
 
 async function cancelOrder(orderId, reason, client) {
@@ -193,8 +217,10 @@ async function syncPayment(transactionId) {
   if (p.applied || cinetpay.mode() !== 'live') return p;
   const r = await cinetpay.checkPayment(transactionId);
   if (r && (r.status === 'ACCEPTED' || r.status === 'REFUSED')) {
-    if (r.status === 'ACCEPTED' && r.amount && r.amount < p.amount) {
-      return applyPayment(transactionId, 'REFUSED', r.method, `montant reçu ${r.amount} inférieur à ${p.amount}`);
+    if (r.status === 'ACCEPTED' && !(r.amount >= p.amount)) {
+      // montant absent ou inférieur à celui attendu : jamais validé automatiquement
+      await securityAlert(p.user_id, `Paiement ${transactionId} : montant reçu ${r.amount || 'inconnu'} pour ${p.amount} attendus. Vérifiez dans CinetPay.`);
+      return applyPayment(transactionId, 'REFUSED', r.method, `montant reçu ${r.amount || 'inconnu'} inférieur à ${p.amount}`);
     }
     return applyPayment(transactionId, r.status, r.method, r.message);
   }
@@ -251,6 +277,7 @@ async function orderWithItems(o) {
 }
 
 module.exports = {
+  rewardReferral,
   STATUS_LABEL, cotTarget, createOrder, cancelOrder, onlinePaymentEnabled, startPayment, applyPayment,
   addCotisationPayment, syncPayment, deliverCotisation, expireStalePayments, orderWithItems, nextWeekday, audit,
 };

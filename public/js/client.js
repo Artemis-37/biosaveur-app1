@@ -244,6 +244,7 @@
       if (valid.length !== cart.length) Cart.save(valid);
       var sub = 0; valid.forEach(function (c) { sub += by[c.pid].price * c.q; });
       var fee = App.cfg.deliveryFee, tot = sub + fee;
+      CV.shown = tot;
       var cot = res[1] && res[1].cotisation;
       var canCot = cot && cot.paid >= tot;
       if (CV.pay === 'cotisation' && !canCot) CV.pay = 'livraison';
@@ -293,7 +294,7 @@
   App.A.setPay = function (d, el) { CV.pay = el.value; App.render(); };
   App.A.checkout = function (d, el) {
     el.disabled = true;
-    var body = { items: Cart.items().map(function (c) { return { product_id: c.pid, option: c.opt, qty: c.q }; }), day: CV.pre ? CV.preDay : days()[CV.day], slot: App.cfg.slots[CV.slot], pay_method: CV.pay };
+    var body = { items: Cart.items().map(function (c) { return { product_id: c.pid, option: c.opt, qty: c.q }; }), day: CV.pre ? CV.preDay : days()[CV.day], slot: App.cfg.slots[CV.slot], pay_method: CV.pay, expected_total: CV.shown };
     App.post('/client/orders', body).then(function (r) {
       if (r.payment_url) { App.openPayment(r.payment_url, r.transaction_id); return; }
       Cart.clear();

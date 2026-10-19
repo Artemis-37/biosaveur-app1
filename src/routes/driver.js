@@ -37,6 +37,7 @@ async function deliver(o, user) {
   await db.tx(async (c) => {
     await c.query("UPDATE orders SET status='livree', delivered_at=now(), paid=true, driver_id=COALESCE(driver_id,$2) WHERE id=$1", [o.id, user.id]);
     await notify(o.user_id, `Commande ${o.number} livrée. Merci pour votre confiance !`, c);
+    await services.rewardReferral(o.id, c);
     await audit(user.id, 'remise', `${o.number}${o.pay_method === 'livraison' && !o.paid ? ` · encaissé ${o.total}` : ''}`, c);
   });
 }

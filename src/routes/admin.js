@@ -162,6 +162,7 @@ r.put('/orders/:id/status', h(async (req, res) => {
     const driver = req.body.driver_id ? int(req.body.driver_id) : o.driver_id;
     await db.query(`UPDATE orders SET status=$2, driver_id=$3, delivered_at=CASE WHEN $2='livree' THEN now() ELSE delivered_at END,
       paid = CASE WHEN $2='livree' THEN true ELSE paid END WHERE id=$1`, [o.id, s, driver]);
+    if (s === 'livree') await db.tx((c) => services.rewardReferral(o.id, c));
     await notify(o.user_id, `Commande ${o.number} : ${services.STATUS_LABEL[s]}.`);
   }
   await audit(req.user.id, 'statut commande', `${o.number} → ${s}`);

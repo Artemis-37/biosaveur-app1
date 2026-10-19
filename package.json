@@ -23,6 +23,7 @@
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",
     "express": "^4.21.1",
+    "express-rate-limit": "^7.4.1",
     "firebase-admin": "^12.7.0",
     "jsonwebtoken": "^9.0.2",
     "nodemailer": "^6.9.16",

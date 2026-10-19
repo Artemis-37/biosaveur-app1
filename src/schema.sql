@@ -222,3 +222,7 @@ CREATE TABLE IF NOT EXISTS device_tokens (
   platform   TEXT NOT NULL DEFAULT 'android',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- v9 : parrainage récompensé à la première livraison
+ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_rewarded BOOLEAN NOT NULL DEFAULT FALSE;
+UPDATE users SET referral_rewarded = TRUE WHERE referred_by IS NOT NULL AND NOT referral_rewarded;

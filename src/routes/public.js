@@ -101,8 +101,7 @@ r.post('/auth/register', h(async (req, res) => {
       [name, phone, await hash(password), commune, address, `BSV-${code(4)}`, referrer ? referrer.id : null, email || null, newQrToken()]
     )).rows[0];
     if (referrer && referrer.role === 'client') {
-      await c.query('UPDATE users SET points = points + $2 WHERE id=$1', [referrer.id, config.shop.referralPoints]);
-      await notify(referrer.id, `${name} s’est inscrit avec votre code : +${config.shop.referralPoints} points.`, c);
+      await notify(referrer.id, `${name} s’est inscrit avec votre code. Vous recevrez ${config.shop.referralPoints} points dès sa première livraison.`, c);
     } else if (referrer) {
       await notify(referrer.id, `Nouveau client apporté : ${name}. Vous toucherez une commission sur ses commandes livrées.`, c);
     }

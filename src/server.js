@@ -5,6 +5,7 @@ const cookieParser = require('cookie-parser');
 const config = require('./config');
 const db = require('./db');
 const { seed } = require('./seed');
+const rateLimit = require('express-rate-limit');
 const { loadUser } = require('./auth');
 const services = require('./services');
 
@@ -17,6 +18,7 @@ app.use((req, res, next) => {
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     'X-Frame-Options': 'SAMEORIGIN',
+    ...(config.isProd ? { 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains' } : {}),
   });
   next();
 });
@@ -35,6 +37,12 @@ app.use('/api', (req, res, next) => {
   }
   next();
 });
+// Limitation de débit : freine le rejeu automatisé (Burp Intruder, bruteforce).
+const lim = (windowMs, max, message) => rateLimit({ windowMs, max, standardHeaders: true, legacyHeaders: false, message: { error: message }, skip: () => process.env.RATE_LIMIT_OFF === '1' });
+app.use('/api', lim(60000, 300, 'Trop de requêtes, patientez un instant.'));
+app.use('/api/auth/login', lim(15 * 60000, 30, 'Trop de tentatives de connexion, réessayez plus tard.'));
+app.use('/api/auth', lim(15 * 60000, 30, 'Trop de tentatives, réessayez plus tard.'));
+app.post('/api/client/orders', lim(60000, 10, 'Trop de commandes en peu de temps.'));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false, limit: '200kb' }));
 app.use(cookieParser());

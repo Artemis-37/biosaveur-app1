@@ -5,6 +5,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 
 process.env.SEED_DEMO = 'true';
+process.env.RATE_LIMIT_OFF = '1';
 process.env.CINETPAY_SIMULATE = 'true';
 // faux serveur SMTP pour vérifier l'envoi des e-mails
 const net = require('node:net');
@@ -302,4 +303,28 @@ test('e-mail : notification envoyée au client qui en a un, sauf s\'il la désac
   await admin('POST', '/admin/announcements', { audience: 'commune:Cocody', body: 'Annonce par e-mail test' });
   await new Promise((r2) => setTimeout(r2, 3500));
   assert.ok(!mails.some((x) => x.includes(email)), 'pas d’e-mail si désactivé');
+});
+
+test('sécurité : prix/total falsifiés (Burp / MITM) ignorés ou refusés et signalés', async () => {
+  const c = agent();
+  await c('POST', '/auth/login', { phone: '0700000001', password: 'demo1234' });
+  const p = (await c('GET', '/products')).body.find((x) => x.stock > 5 && x.category !== 'evenements');
+  const opt = p.options && p.options.length ? { option: p.options[0] } : {};
+  const day = new Date().toISOString().slice(0, 10);
+  const base = { items: [{ product_id: p.id, qty: 1, ...opt }], day, slot: '10h – 12h', pay_method: 'livraison' };
+  // Total affiché falsifié à la baisse : refus
+  let r = await c('POST', '/client/orders', { ...base, expected_total: 100 });
+  assert.equal(r.status, 400, JSON.stringify(r.body));
+  // Prix injecté dans les lignes : ignoré, le serveur recalcule
+  r = await c('POST', '/client/orders', { ...base, items: [{ product_id: p.id, qty: 1, ...opt, price: 1, unit_price: 1 }], total: 1, fee: 0, expected_total: p.price + 1000 });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.order.total, p.price + 1000);
+  // Quantité négative ou non entière : refus
+  r = await c('POST', '/client/orders', { ...base, items: [{ product_id: p.id, qty: -3, ...opt }] });
+  assert.equal(r.status, 400);
+  // Alerte enregistrée pour l'administrateur
+  const a = agent();
+  await a('POST', '/auth/login', { phone: '0700000000', password: 'demo1234' });
+  const log = await a('GET', '/admin/audit');
+  assert.ok(JSON.stringify(log.body).includes('ALERTE sécurité'), 'alerte sécurité journalisée');
 });

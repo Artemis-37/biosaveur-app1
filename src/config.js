@@ -41,7 +41,8 @@ const config = {
     secretKey: env.CINETPAY_SECRET_KEY || '',
     baseUrl: (env.CINETPAY_BASE_URL || 'https://api-checkout.cinetpay.com/v2').replace(/\/$/, ''),
     // Mode simulation : utile tant que CinetPay n'est pas opérationnel.
-    simulate: bool(env.CINETPAY_SIMULATE, !isProd),
+    // La simulation permet de « payer » sans argent : interdite en production sauf en mode démo (données fictives).
+    simulate: bool(env.CINETPAY_SIMULATE, !isProd) && (!isProd || bool(env.SEED_DEMO, false)),
   },
 
   map: {
