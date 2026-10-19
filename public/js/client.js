@@ -272,7 +272,7 @@
         (isPre ? '' : '<span style="font-weight:700">Jour de livraison</span><div class="chips">') + (isPre ? [] : ds).map(function (d, i) { return '<button class="chip" data-act="setDay" data-i="' + i + '" aria-pressed="' + (CV.day === i) + '">' + App.fday(d) + '</button>'; }).join('') + (isPre ? '' : '</div>') +
         '<span style="font-weight:700">Créneau horaire</span><div class="slots">' + App.cfg.slots.map(function (s, i) { return '<button class="chip" data-act="setSlot" data-i="' + i + '" aria-pressed="' + (CV.slot === i) + '">' + s + '</button>'; }).join('') + '</div></section>' +
         '<section class="card pad" style="padding-bottom:4px"><h2 class="sec-t" style="font-size:17px;margin-bottom:8px">Paiement</h2>' +
-        radio('livraison', 'Paiement à la livraison', 'Espèces au livreur', true) +
+        radio('livraison', 'Paiement à la livraison', 'Espèces ou Mobile Money au livreur', true) +
         radio('cinetpay', 'Payer en ligne avec CinetPay', App.cfg.onlinePayment ? 'Orange Money, MTN MoMo, Moov Money, Wave ou carte bancaire — tout passe par CinetPay' : 'Bientôt disponible', App.cfg.onlinePayment) +
         radio('cotisation', 'Débiter ma cotisation', cot ? 'Solde : ' + fcfa(cot.paid) + (canCot ? '' : ' (insuffisant)') : 'Aucune cotisation en cours', !!canCot) +
         '</section></div>' +
