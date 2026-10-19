@@ -282,12 +282,7 @@
   App.badges = { notifications: 0, messages: 0 };
   App.refreshBadges = function () {
     var u = App.cfg.user; if (!u) return;
-    if (u.role !== 'client') {
-      App.get('/staff/notifications/count').then(function (b) {
-        document.querySelectorAll('[data-badge=bell]').forEach(function (el) { el.textContent = b.unread > 99 ? '99+' : b.unread; el.hidden = !b.unread; });
-      }).catch(function () { /* silencieux */ });
-      return;
-    }
+    if (u.role !== 'client') return;
     App.get('/client/badges').then(function (b) {
       var changed = b.notifications !== App.badges.notifications || b.messages !== App.badges.messages;
       App.badges = b;
