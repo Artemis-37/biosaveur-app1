@@ -6,7 +6,7 @@
   App.shells.staff = function () {
     var u = App.cfg.user;
     document.getElementById('hdr').innerHTML = '<div class="staffbar"><div class="wrap"><span class="logo">biosaveur</span><span class="small">' + (u ? esc(u.company || u.name) + ' · ' + esc(App.ROLE_LABEL[u.role] || u.role) : '') + '</span><span class="sp"></span>' +
-      (u && (u.role === 'admin' || u.role === 'directeur') ? '<a href="#/admin">' + ic('grid', 's') + 'Admin</a><a href="#/livreur">' + ic('truck', 's') + 'Tournée</a>' : '') +
+      (u && (u.role === 'admin' || u.role === 'directeur') ? '<a href="#/admin">' + ic('dash', 's') + 'Admin</a><a href="#/livreur">' + ic('truck', 's') + 'Tournée</a>' : '') +
       '<a href="#/">' + ic('store', 's') + 'Boutique</a><button data-act="logout">' + ic('logout', 's') + 'Déconnexion</button></div></div>';
     document.getElementById('main').className = '';
     document.getElementById('ftr').innerHTML = '';
@@ -93,7 +93,7 @@
       '<div style="padding:0 12px"><div id="tmap" class="lmap"></div></div>' +
       '<div class="legend" style="padding:10px 16px 0"><span><i style="background:var(--j);border:1.5px solid var(--vf)"></i>Prochain arrêt</span><span><i style="background:var(--vf)"></i>À livrer</span><span><i style="background:var(--v)"></i>Livré</span><span><i style="background:#fff;border:1.5px solid var(--vf)"></i>Entrepôt</span></div>' +
       '<div class="pad stack" style="gap:12px">' + selCard +
-      (stops.length ? '<a class="btn y full" href="' + M.tourUrl(depot, stops) + '" target="_blank" rel="noopener">' + ic('truck', 's') + 'Ouvrir toute la tournée dans Google Maps</a>' : '') +
+      (stops.length ? '<a class="btn y full" href="' + M.tourUrl(depot, stops) + '" target="_blank" rel="noopener">' + ic('route', 's') + 'Ouvrir toute la tournée dans Google Maps</a>' : '') +
       '<span class="xs muted">Touchez un repère pour voir l’arrêt. La navigation s’ouvre dans Google Maps ou Waze avec la position GPS du client.</span></div></aside>' +
       '<div class="stack" style="gap:10px"><div class="chips" role="group" aria-label="Filtre">' + [['toutes', 'Toutes'], ['alivrer', 'À livrer'], ['livrees', 'Livrées']].map(function (x) { return '<button class="chip" data-act="livFilter" data-v="' + x[0] + '" aria-pressed="' + (LV.filter === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>' +
       cards + '</div></div></div>';

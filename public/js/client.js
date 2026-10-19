@@ -63,7 +63,7 @@
       '<a class="logo" href="#/" aria-label="BIOSAVEUR, accueil" style="text-decoration:none">biosaveur</a>' +
       '<form class="srch" data-form="search" role="search"><label for="q">' + ic('search', 's') + '<input id="q" name="q" type="search" placeholder="Rechercher poulet, découpes, packs…" value="' + esc(r.name === 'recherche' ? (r.q.q || '') : '') + '" autocomplete="off"></label><button type="submit">Rechercher</button></form>' +
       '<nav class="ch-links" aria-label="Raccourcis">' +
-      '<button data-act="nav" data-h="#/cotisation">' + ic('coin') + '<span class="lbl">Cotisation</span></button>' +
+      '<button data-act="nav" data-h="#/cotisation">' + ic('wallet') + '<span class="lbl">Cotisation</span></button>' +
       '<button data-act="nav" data-h="' + (u ? '#/compte' : '#/connexion') + '">' + ic('user') + '<span class="lbl">' + (u ? 'Compte' : 'Se connecter') + '</span><span class="badge" data-badge="acct"' + (nb ? '' : ' hidden') + '>' + nb + '</span></button>' +
       '<button data-act="nav" data-h="#/panier" aria-label="Panier">' + ic('cart') + '<span class="lbl">Panier</span><span class="badge num" data-badge="cart"' + (n ? '' : ' hidden') + '>' + n + '</span></button>' +
       '</nav></div></header>' +
@@ -130,7 +130,7 @@
         '</div>' +
         '<div class="side-promos">' +
         '<a class="promo w" style="text-decoration:none" href="#/parrainage">' + ic('gift', 'l') + '<strong>Parrainez vos proches</strong><span>' + App.cfg.referralPoints + ' points par filleul, convertibles en FCFA.</span></a>' +
-        '<a class="promo w" style="text-decoration:none" href="#/portions">' + ic('list', 'l') + '<strong>Calculateur de portions</strong><span>Combien de poulets pour vos invités ?</span></a>' +
+        '<a class="promo w" style="text-decoration:none" href="#/portions">' + ic('calc', 'l') + '<strong>Calculateur de portions</strong><span>Combien de poulets pour vos invités ?</span></a>' +
         '<a class="promo y" style="text-decoration:none" href="#/cat/evenements">' + ic('cal', 'l') + '<strong>Précommande événements</strong><span>Fêtes, mariages, baptêmes : réservez à l’avance.</span></a>' +
         '</div></div>' +
         '<div class="cats-m">' + CATS.map(function (x) { return '<a href="#/cat/' + x.id + '" style="text-decoration:none;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:var(--encre);text-align:center"><span class="o">' + ic(x.icon) + '</span>' + esc(x.label) + '</a>'; }).join('') + '</div>' +
@@ -356,7 +356,7 @@
     return App.get('/client/orders').then(function (list) {
       return shell('commandes', '<section class="card pad"><h1 class="sec-t" style="margin-bottom:8px">Mes commandes</h1>' +
         (list.length ? list.map(function (o) { return '<a class="list-row" style="text-decoration:none;color:inherit;padding:8px 0" href="#/commande/' + o.id + '"><span style="flex:1;min-width:0"><strong>' + esc(o.number) + '</strong>' + (o.kind === 'cotisation' ? ' · Cotisation' : '') + '<br><span class="small muted">' + App.fday(o.day) + ' · ' + o.slot + ' · ' + esc(App.itemsTxt(o)) + '</span></span>' + App.stPill(o.status) + ic('right', 's') + '</a>'; }).join('') :
-          '<div class="empty"><span class="o">' + ic('list', 'l') + '</span><strong>Aucune commande pour le moment</strong><a class="btn p sm" href="#/">Découvrir la boutique</a></div>') +
+          '<div class="empty"><span class="o">' + ic('orders', 'l') + '</span><strong>Aucune commande pour le moment</strong><a class="btn p sm" href="#/">Découvrir la boutique</a></div>') +
         '</section>');
     });
   });
@@ -381,12 +381,12 @@
         '<div style="flex:1 1 180px"><h1 style="font-size:21px;color:var(--vf)">Bonjour, ' + esc(u.name.split(' ')[0]) + '</h1><span class="small muted">' + App.phone(u.phone) + ' · Code parrain ' + esc(u.referral_code) + '</span></div>' +
         '<a class="btn o sm" href="#/profil">' + ic('pin', 's') + 'Profil et adresse</a></section>' +
         '<div class="tiles">' +
-        '<button data-act="nav" data-h="#/commandes">' + ic('list') + 'Mes commandes</button>' +
-        '<button data-act="nav" data-h="#/cotisation">' + ic('coin') + 'Cotisation</button>' +
+        '<button data-act="nav" data-h="#/commandes">' + ic('orders') + 'Mes commandes</button>' +
+        '<button data-act="nav" data-h="#/cotisation">' + ic('wallet') + 'Cotisation</button>' +
         '<button data-act="nav" data-h="#/messages">' + ic('chat') + 'Messages' + (App.badges.messages ? '<span class="badge">' + App.badges.messages + '</span>' : '') + '</button>' +
         '<button data-act="nav" data-h="#/parrainage">' + ic('gift') + 'Parrainage</button>' +
         '<button data-act="nav" data-h="#/profil">' + ic('pin') + 'Profil</button>' +
-        '<button data-act="myQr">' + ic('list') + 'Mon QR</button>' +
+        '<button data-act="myQr">' + ic('qr') + 'Mon QR</button>' +
         '<button data-act="logout">' + ic('logout') + 'Déconnexion</button></div>' +
         pc +
         '<section class="card pad stack" style="gap:10px"><div class="between"><h2 class="sec-t" style="font-size:17px">Mes badges de fidélité</h2><span class="pill ok">Niveau ' + esc(loy.level) + ' · ' + loy.earned + '/' + loy.total + '</span></div>' +

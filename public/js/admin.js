@@ -3,8 +3,8 @@
   'use strict';
   var App = window.App, ic = App.ic, esc = App.esc, fcfa = App.fcfa, M = App.map;
 
-  var MENU = [['apercu', 'home', 'Vue d’ensemble'], ['commandes', 'truck', 'Commandes & livraisons'], ['clients', 'users', 'Clients'], ['cotisations', 'coin', 'Cotisations & versements'],
-    ['stock', 'box', 'Produits & stock'], ['calendrier', 'truck', 'Calendrier & zones'], ['messages', 'chat', 'Messagerie'], ['annonces', 'chat', 'SMS & annonces'], ['equipe', 'user', 'Équipe'], ['cinetpay', 'card', 'Paiement CinetPay'], ['journal', 'list', 'Journal'], ['demo', 'list', 'Version démo']];
+  var MENU = [['apercu', 'dash', 'Vue d’ensemble'], ['commandes', 'orders', 'Commandes & livraisons'], ['clients', 'users', 'Clients'], ['cotisations', 'wallet', 'Cotisations & versements'],
+    ['stock', 'box', 'Produits & stock'], ['calendrier', 'cal', 'Calendrier & zones'], ['messages', 'chat', 'Messagerie'], ['annonces', 'megaphone', 'SMS & annonces'], ['equipe', 'idcard', 'Équipe'], ['cinetpay', 'mobilepay', 'Paiement CinetPay'], ['journal', 'history', 'Journal'], ['demo', 'flask', 'Version démo']];
   var ROLES = { admin: 'Administrateur', directeur: 'Directeur(trice)', informaticien: 'Informaticien', livreur: 'Livreur' };
   var INFO_SECTIONS = ['stock', 'cinetpay', 'journal', 'demo'];
   function roleOpts(cur) { return ['livreur', 'admin', 'directeur', 'informaticien'].map(function (k) { return '<option value="' + k + '"' + (k === cur ? ' selected' : '') + '>' + ROLES[k] + '</option>'; }).join(''); }
