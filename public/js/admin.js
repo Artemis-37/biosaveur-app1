@@ -4,8 +4,8 @@
   var App = window.App, ic = App.ic, esc = App.esc, fcfa = App.fcfa, M = App.map;
 
   var MENU = [['apercu', 'home', 'Vue d’ensemble'], ['commandes', 'truck', 'Commandes & livraisons'], ['clients', 'users', 'Clients'], ['cotisations', 'coin', 'Cotisations & versements'],
-    ['stock', 'box', 'Produits & stock'], ['appro', 'truck', 'Approvisionnement'], ['messages', 'chat', 'Messagerie'], ['equipe', 'user', 'Équipe'], ['cinetpay', 'card', 'Paiement CinetPay'], ['journal', 'list', 'Journal'], ['demo', 'list', 'Version démo']];
-  var ROLES = { admin: 'Administrateur', livreur: 'Livreur', fournisseur: 'Fournisseur' };
+    ['stock', 'box', 'Produits & stock'], ['messages', 'chat', 'Messagerie'], ['equipe', 'user', 'Équipe'], ['cinetpay', 'card', 'Paiement CinetPay'], ['journal', 'list', 'Journal'], ['demo', 'list', 'Version démo']];
+  var ROLES = { admin: 'Administrateur', livreur: 'Livreur' };
   var AV = { filter: 'tous', day: App.iso(new Date()), status: '', thread: null, q: '' };
 
   function frame(cur, body, badges) {
@@ -167,16 +167,15 @@
   };
 
   S.stock = function () {
-    return Promise.all([App.get('/admin/products'), App.get('/admin/staff')]).then(function (res) {
-      var list = res[0]; AV.products = list;
-      AV.suppliers = res[1].filter(function (u) { return u.role === 'fournisseur' && u.active; });
+    return App.get('/admin/products').then(function (list) {
+      AV.products = list;
       return frame('stock', head('Produits & stock', list.length + ' produit(s)', '<button class="btn p sm" data-act="prodEdit">+ Nouveau produit</button>') +
-        '<section class="card pad tbl"><table><thead><tr><th>Produit</th><th>Prix</th><th>Disponible</th><th>Seuil</th><th>Fournisseur</th><th>Délai</th><th>État</th><th></th></tr></thead><tbody>' +
+        '<section class="card pad tbl"><table><thead><tr><th>Produit</th><th>Prix</th><th>Disponible</th><th>Seuil</th><th>À commander</th><th>Fournisseur</th><th>Délai d’arrivée</th><th>État</th><th></th></tr></thead><tbody>' +
         list.map(function (p) {
           var state = !p.visible ? '<span class="pill neutral">Masqué</span>' : p.stock <= 0 ? '<span class="pill err">Épuisé</span>' : p.stock <= p.threshold ? '<span class="pill err">Stock bas</span>' : '<span class="pill ok">OK</span>';
           return '<tr><td><strong>' + esc(p.name) + '</strong>' + (p.flash ? ' <span class="pill warn">Flash</span>' : '') + '</td><td class="num">' + fcfa(p.price) + '</td>' +
             '<td><label for="sq-' + p.id + '" hidden>Disponible ' + esc(p.name) + '</label><input id="sq-' + p.id + '" type="number" min="0" value="' + p.stock + '" data-chg="stockSet" data-id="' + p.id + '"></td>' +
-            '<td class="num">' + p.threshold + '</td><td class="small">' + esc(p.supplier) + '</td><td class="small">' + esc(p.lead_time) + '</td><td>' + state + '</td><td><button class="btn o sm" data-act="prodEdit" data-id="' + p.id + '">Modifier</button></td></tr>';
+            '<td class="num">' + p.threshold + '</td><td class="num">' + (p.stock <= p.threshold ? '<strong>' + (p.threshold * 2 - p.stock) + '</strong>' : '—') + '</td><td class="small">' + esc(p.supplier) + '</td><td class="small">' + esc(p.lead_time) + '</td><td>' + state + '</td><td><button class="btn o sm" data-act="prodEdit" data-id="' + p.id + '">Modifier</button></td></tr>';
         }).join('') + '</tbody></table></section>');
     });
   };
@@ -191,8 +190,7 @@
       '<div class="form-grid">' + f('price', 'Prix (FCFA)', 'number', ' min="0" required') + f('old_price', 'Ancien prix (barré)', 'number', ' min="0"') + '</div>' +
       '<div class="field"><label for="pe-opt">Présentations (séparées par des virgules)</label><input id="pe-opt" name="options" value="' + esc((p.options || []).join(', ')) + '"></div>' +
       '<div class="form-grid">' + f('stock', 'Stock', 'number', ' min="0"') + f('threshold', 'Seuil d’alerte', 'number', ' min="0"') + '</div>' +
-      '<div class="form-grid">' + f('supplier', 'Fournisseur (nom affiché)') + f('lead_time', 'Délai d’approvisionnement') + '</div>' +
-      '<div class="field"><label for="pe-sid">Compte fournisseur lié</label><select id="pe-sid" name="supplier_id"><option value="">— aucun —</option>' + (AV.suppliers || []).map(function (u) { return '<option value="' + u.id + '"' + (p.supplier_id === u.id ? ' selected' : '') + '>' + esc(u.company || u.name) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="form-grid">' + f('supplier', 'Fournisseur') + f('lead_time', 'Délai d’approvisionnement') + '</div>' +
       '<div class="form-grid">' + f('tag', 'Étiquette (Halal, Promo…)') + '<div class="field"><label for="pe-image_url">Photo (lien https)</label><input id="pe-image_url" name="image_url" type="text" value="' + esc(p.image_url || '') + '"></div></div>' +
       '<div class="field"><div class="row" style="gap:12px;align-items:center"><img id="pe-prev" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:10px;background:#eef2f0' + (p.image_url ? '' : ';display:none') + '" src="' + esc(App.imgUrl(p.image_url || '')) + '"><label class="btn o sm" for="pe-file" style="cursor:pointer">Téléverser une photo</label><input id="pe-file" type="file" accept="image/*" hidden data-chg="photoPick"><span class="xs muted" id="pe-st">JPEG, PNG ou WebP · redimensionnée automatiquement</span></div></div>' +
       '<div class="field"><label for="pe-desc">Description</label><textarea id="pe-desc" name="description">' + esc(p.description) + '</textarea></div>' +
@@ -228,7 +226,6 @@
   };
   App.F.prodSave = function (fd, form) {
     var b = {}; fd.forEach(function (v, k) { b[k] = v; });
-    if (b.supplier_id === '') b.supplier_id = null;
     b.flash = !!fd.get('flash'); b.visible = !!fd.get('visible');
     var id = form.getAttribute('data-id');
     return (id ? App.put('/admin/products/' + id, b) : App.post('/admin/products', b)).then(function () { App.modal(null); App.toast('Produit enregistré.'); App.render(); });
@@ -256,15 +253,14 @@
 
   S.equipe = function () {
     return App.get('/admin/staff').then(function (list) {
-      return frame('equipe', head('Équipe', 'Livreurs, fournisseurs et administrateurs') +
+      return frame('equipe', head('Équipe', 'Livreurs et administrateurs') +
         '<section class="card pad tbl"><table><thead><tr><th>Nom</th><th>Rôle</th><th>Téléphone</th><th>Dernière activité</th><th>État</th><th></th></tr></thead><tbody>' +
         list.map(function (u) { return '<tr><td><strong>' + esc(u.name) + '</strong></td><td>' + esc(ROLES[u.role] || u.role) + (u.company ? '<br><span class="xs muted">' + esc(u.company) + '</span>' : '') + '</td><td class="num">' + App.phone(u.phone) + '</td><td>' + App.ago(u.last_active) + '</td><td>' + (u.active ? '<span class="pill ok">Actif</span>' : '<span class="pill neutral">Désactivé</span>') + '</td><td><div class="row" style="gap:6px"><button class="btn o sm" data-act="staffPw" data-id="' + u.id + '">Mot de passe</button>' + (u.id !== App.cfg.user.id ? '<button class="btn o sm" data-act="staffActive" data-id="' + u.id + '" data-v="' + (u.active ? '0' : '1') + '">' + (u.active ? 'Désactiver' : 'Réactiver') + '</button>' : '') + '</div></td></tr>'; }).join('') +
         '</tbody></table></section>' +
         '<section class="card pad stack" style="gap:12px"><h2 class="sec-t" style="font-size:16px">Ajouter un membre</h2><form class="form-grid" data-form="staffAdd">' +
         '<div class="field"><label for="sn">Nom</label><input id="sn" name="name" required></div>' +
         '<div class="field"><label for="sp">Téléphone</label><input id="sp" name="phone" inputmode="tel" required></div>' +
-        '<div class="field"><label for="sr">Rôle</label><select id="sr" name="role"><option value="livreur">Livreur</option><option value="fournisseur">Fournisseur</option><option value="admin">Administrateur</option></select></div>' +
-        '<div class="field"><label for="sc">Entreprise (fournisseur)</label><input id="sc" name="company" maxlength="120"></div>' +
+        '<div class="field"><label for="sr">Rôle</label><select id="sr" name="role"><option value="livreur">Livreur</option><option value="admin">Administrateur</option></select></div>' +
         '<div class="field"><label for="sw">Mot de passe provisoire</label><input id="sw" name="password" type="text" minlength="6" required></div>' +
         '<button class="btn p" type="submit" style="align-self:end">Créer le compte</button></form></section>');
     });
@@ -306,33 +302,6 @@
   App.A.cpTest = function () { App.post('/admin/cinetpay/test').then(function (r) { App.openPayment(r.payment_url, r.transaction_id); }).catch(App.err); };
   App.A.cpSync = function (d) { App.post('/admin/cinetpay/sync/' + encodeURIComponent(d.v)).then(function (r) { App.toast('État : ' + r.status); App.render(); }).catch(App.err); };
 
-
-  var SUP_ST = { demandee: ['warn', 'Demandée'], confirmee: ['ok', 'Confirmée'], livree: ['ok', 'Livrée'], refusee: ['err', 'Refusée'], annulee: ['neutral', 'Annulée'] };
-  S.appro = function () {
-    return Promise.all([App.get('/admin/supply'), App.get('/admin/products')]).then(function (res) {
-      var d = res[0]; AV.products = res[1]; AV.suppliers = d.suppliers;
-      return frame('appro', head('Approvisionnement', 'Commandes passées à vos fournisseurs', '<button class="btn p sm" data-act="supplyNew">+ Commander à un fournisseur</button>') +
-        '<section class="card pad tbl"><table><thead><tr><th>N°</th><th>Fournisseur</th><th>Produit</th><th>Qté</th><th>Pour le</th><th>État</th><th></th></tr></thead><tbody>' +
-        (d.orders.map(function (o) {
-          var st = SUP_ST[o.status] || ['neutral', o.status];
-          return '<tr><td class="num">' + esc(o.number) + '</td><td>' + esc(o.supplier_company || o.supplier_name) + '</td><td>' + esc(o.product_name) + (o.supplier_note ? '<br><span class="xs muted">' + esc(o.supplier_note) + '</span>' : '') + '</td><td class="num">' + o.qty + '</td><td class="small">' + esc(o.due_date ? String(o.due_date).slice(0, 10) : '—') + '</td><td><span class="pill ' + st[0] + '">' + st[1] + '</span></td><td>' + (o.status === 'demandee' || o.status === 'confirmee' ? '<button class="btn o sm" data-act="supplyCancel" data-id="' + o.id + '">Annuler</button>' : '') + '</td></tr>';
-        }).join('') || '<tr><td colspan="7" class="muted">Aucune commande.</td></tr>') + '</tbody></table></section>');
-    });
-  };
-  App.A.supplyNew = function () {
-    App.modal('<h2 class="sec-t">Commander à un fournisseur</h2><form class="stack" style="gap:12px" data-form="supplyNew">' +
-      '<div class="field"><label for="sp-p">Produit</label><select id="sp-p" name="product_id">' + (AV.products || []).map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + ' (stock ' + p.stock + ')</option>'; }).join('') + '</select></div>' +
-      '<div class="field"><label for="sp-s">Fournisseur</label><select id="sp-s" name="supplier_id">' + (AV.suppliers || []).map(function (u) { return '<option value="' + u.id + '">' + esc(u.company || u.name) + '</option>'; }).join('') + '</select></div>' +
-      '<div class="form-grid"><div class="field"><label for="sp-q">Quantité</label><input id="sp-q" name="qty" type="number" min="1" required></div><div class="field"><label for="sp-c">Prix d’achat unitaire (FCFA)</label><input id="sp-c" name="unit_cost" type="number" min="0"></div></div>' +
-      '<div class="field"><label for="sp-d">Pour le</label><input id="sp-d" name="due_date" type="date"></div>' +
-      '<div class="field"><label for="sp-n">Note</label><input id="sp-n" name="note" maxlength="300"></div>' +
-      '<button class="btn p" type="submit">Envoyer la commande</button><button class="linkbtn" type="button" data-act="closeM">Annuler</button></form>');
-  };
-  App.F.supplyNew = function (fd) {
-    var b = {}; fd.forEach(function (v, k) { b[k] = v; });
-    return App.post('/admin/supply', b).then(function () { App.modal(null); App.toast('Commande envoyée au fournisseur.'); App.render(); });
-  };
-  App.A.supplyCancel = function (d) { App.put('/admin/supply/' + d.id + '/cancel', {}).then(function () { App.toast('Commande annulée.'); App.render(); }).catch(App.err); };
 
   S.demo = function () {
     return App.get('/admin/demo').then(function (d) {

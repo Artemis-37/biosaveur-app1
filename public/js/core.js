@@ -128,8 +128,8 @@
   App.err = function (e) { App.toast(e && e.message ? e.message : String(e)); };
 
   /* ---------- routage ---------- */
-  App.ROLE_LABEL = { client: 'Client', livreur: 'Livreur', admin: 'Administrateur', fournisseur: 'Fournisseur' };
-  App.homeOf = function (role) { return { livreur: '#/livreur', admin: '#/admin', fournisseur: '#/fournisseur' }[role] || '#/'; };
+  App.ROLE_LABEL = { client: 'Client', livreur: 'Livreur', admin: 'Administrateur' };
+  App.homeOf = function (role) { return { livreur: '#/livreur', admin: '#/admin' }[role] || '#/'; };
   App.routes = {};
   App.route = function (name, fn) { App.routes[name] = fn; };
   App.go = function (hash) { if (location.hash === hash) App.render(); else location.hash = hash; };

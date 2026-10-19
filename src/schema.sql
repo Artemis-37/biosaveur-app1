@@ -160,7 +160,12 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 CREATE SEQUENCE IF NOT EXISTS order_number_seq START 1001;
 
--- ===== v2 : fournisseurs, démonstration =====
+-- ===== v2 : démonstration =====
+-- Les comptes fournisseurs et les commandes d'approvisionnement ne figurent pas au cahier des charges : nettoyage.
+DROP TABLE IF EXISTS supply_orders;
+DROP SEQUENCE IF EXISTS supply_number_seq;
+ALTER TABLE products DROP COLUMN IF EXISTS supplier_id;
+DELETE FROM users WHERE role='fournisseur';
 -- Le rôle « partenaire » a été retiré : nettoyage des anciens comptes et de leurs versements.
 DELETE FROM users WHERE role='partenaire';
 DROP TABLE IF EXISTS partner_payouts;
@@ -168,30 +173,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS demo BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS company TEXT NOT NULL DEFAULT '';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS commission_rate NUMERIC(5,4) NOT NULL DEFAULT 0.05;
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
-ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('client','livreur','admin','fournisseur'));
-
-ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
-
--- commandes d'approvisionnement passées par BIOSAVEUR aux fournisseurs
-CREATE TABLE IF NOT EXISTS supply_orders (
-  id           SERIAL PRIMARY KEY,
-  number       TEXT NOT NULL UNIQUE,
-  supplier_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  product_id   INTEGER REFERENCES products(id) ON DELETE SET NULL,
-  product_name TEXT NOT NULL,
-  qty          INTEGER NOT NULL CHECK (qty > 0),
-  unit_cost    INTEGER NOT NULL DEFAULT 0,
-  due_date     DATE,
-  status       TEXT NOT NULL DEFAULT 'demandee' CHECK (status IN ('demandee','confirmee','livree','refusee','annulee')),
-  note         TEXT NOT NULL DEFAULT '',
-  supplier_note TEXT NOT NULL DEFAULT '',
-  created_by   INTEGER REFERENCES users(id) ON DELETE SET NULL,
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  confirmed_at TIMESTAMPTZ,
-  delivered_at TIMESTAMPTZ
-);
-CREATE INDEX IF NOT EXISTS supply_orders_supplier ON supply_orders(supplier_id);
-CREATE SEQUENCE IF NOT EXISTS supply_number_seq START 101;
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('client','livreur','admin'));
 
 -- v3 : photos téléversées depuis le back-office
 CREATE TABLE IF NOT EXISTS images (

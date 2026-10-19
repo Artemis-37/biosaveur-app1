@@ -140,37 +140,12 @@ test('accès protégés', async () => {
   assert.equal(r.status, 403, 'requête sans en-tête anti-CSRF refusée');
 });
 
-test('fournisseur : approvisionnement demandé, confirmé, livré → stock augmenté', async () => {
-  const admin = agent();
-  await admin('POST', '/auth/login', { phone: '0700000000', password: 'demo1234' });
-  const sup = agent();
-  let r = await sup('POST', '/auth/login', { phone: '0700000003', password: 'demo1234' });
-  assert.equal(r.body.user.role, 'fournisseur');
-  const ov = (await sup('GET', '/supplier/overview')).body;
-  assert.ok(ov.products.length > 0, 'produits fournis');
-  const p = ov.products[0];
-  r = await admin('POST', '/admin/supply', { product_id: p.id, qty: 7, due_date: today });
-  assert.equal(r.status, 200, JSON.stringify(r.body));
-  const oid = r.body.id;
-  r = await sup('POST', `/supplier/orders/${oid}/deliver`);
-  assert.equal(r.status, 400, 'livraison avant confirmation refusée');
-  assert.equal((await sup('POST', `/supplier/orders/${oid}/confirm`, { due_date: today })).status, 200);
-  assert.equal((await sup('POST', `/supplier/orders/${oid}/deliver`)).status, 200);
-  const after = (await admin('GET', '/admin/products')).body.find((x) => x.id === p.id);
-  assert.equal(after.stock, p.stock + 7);
-  // un autre fournisseur ne voit pas cette commande
-  const sup2 = agent();
-  await sup2('POST', '/auth/login', { phone: '0700000013', password: 'demo1234' });
-  assert.equal((await sup2('POST', `/supplier/orders/${oid}/confirm`)).status, 404);
-});
-
-test('le rôle partenaire n’existe plus', async () => {
-  const r = await agent()('POST', '/auth/login', { phone: '0700000004', password: 'demo1234' });
-  assert.ok(r.status >= 400, 'compte supprimé');
+test('les rôles partenaire et fournisseur n’existent plus', async () => {
+  for (const ph of ['0700000003', '0700000004']) assert.ok((await agent()('POST', '/auth/login', { phone: ph, password: 'demo1234' })).status >= 400, 'compte supprimé');
   const c = agent();
   await c('POST', '/auth/login', { phone: '0700000001', password: 'demo1234' });
   assert.equal((await c('GET', '/partner/overview')).status, 404);
-  assert.equal((await c('GET', '/supplier/overview')).status, 403);
+  assert.equal((await c('GET', '/supplier/overview')).status, 404);
 });
 
 test('photo : téléversement admin, lecture publique, refus pour un client', async () => {

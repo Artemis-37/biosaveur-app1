@@ -55,7 +55,6 @@ const DEMO_ACCOUNTS = [
   { role: 'admin', name: 'Admin Démo', phone: '0700000000' },
   { role: 'client', name: 'Client Démo', phone: '0700000001', commune: 'Marcory', address: 'Zone 4, rue du Canal', landmark: 'Immeuble beige, 2e porte', lat: 5.2971, lng: -3.9862 },
   { role: 'livreur', name: 'Ibrahim Ouattara (livreur démo)', phone: '0700000002' },
-  { role: 'fournisseur', name: 'Moussa Koné', company: 'Coopérative avicole de Bingerville', phone: '0700000003' },
 ];
 
 // générateur pseudo-aléatoire reproductible
@@ -72,11 +71,6 @@ async function seedDemo() {
 
   // équipe complémentaire
   const driver2 = await ensureUser({ role: 'livreur', name: 'Awa Diallo (livreuse démo)', phone: '0700000012', password: DEMO_PASSWORD, demo: true });
-  const supplier2 = await ensureUser({ role: 'fournisseur', name: 'Paul Assi', company: 'Coopérative d’Azaguié', phone: '0700000013', password: DEMO_PASSWORD, demo: true });
-
-  // fournisseurs des produits
-  await db.query("UPDATE products SET supplier_id=$1 WHERE supplier ILIKE '%Bingerville%' OR supplier ILIKE '%BIOSAVEUR%' OR supplier ILIKE '%Fumoir%'", [ids.fournisseur]);
-  await db.query("UPDATE products SET supplier_id=$1 WHERE supplier ILIKE '%Azagui%'", [supplier2]);
 
   // clients fictifs
   const CL = [
@@ -174,20 +168,6 @@ async function seedDemo() {
     await db.query("INSERT INTO cotisation_payments(cotisation_id,amount,method,created_at) VALUES ($1,$2,'Mobile Money',$3)", [c.id, 6 * config.shop.chickenPrice, addDays(-150)]);
   }
 
-  // approvisionnements
-  const supply = [
-    [ids.fournisseur, 0, 60, 'livree', -40], [ids.fournisseur, 2, 20, 'livree', -25], [supplier2, 1, 30, 'livree', -18],
-    [ids.fournisseur, 0, 50, 'livree', -9], [ids.fournisseur, 4, 25, 'confirmee', 2], [ids.fournisseur, 8, 30, 'demandee', 3],
-    [supplier2, 1, 15, 'demandee', 4], [ids.fournisseur, 7, 12, 'demandee', 2],
-  ];
-  for (const [sid, pi, qty, st, due] of supply) {
-    const num = await db.one("SELECT 'APP-' || nextval('supply_number_seq') AS n");
-    await db.query(`INSERT INTO supply_orders(number,supplier_id,product_id,product_name,qty,unit_cost,due_date,status,created_by,created_at,confirmed_at,delivered_at)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-      [num.n, sid, prods[pi].id, prods[pi].name, qty, Math.round(prods[pi].price * 0.62), isoDate(addDays(due)), st, ids.admin, addDays(due - 4),
-        st !== 'demandee' ? addDays(due - 3) : null, st === 'livree' ? addDays(due) : null]);
-  }
-
   // messages et notifications
   const msg = (uid, team, body, d, read = true) => db.query('INSERT INTO messages(user_id,from_team,author_id,body,read,created_at) VALUES ($1,$2,$3,$4,$5,$6)', [uid, team, team ? ids.admin : uid, body, read, addDays(d)]);
   await msg(ids.client, false, 'Bonjour, puis-je changer mon jour de livraison de cotisation ?', -3);
@@ -200,7 +180,6 @@ async function seedDemo() {
   await note(ids.client, 'Bienvenue sur la démo BIOSAVEUR ! Toutes les données sont fictives.', -10, true);
   await note(ids.client, 'Versement de cotisation reçu : 4 000 FCFA.', -7);
   await note(ids.client, 'Votre commande est en route.', 0);
-  await note(ids.fournisseur, 'Nouvelle commande d’approvisionnement : 30 × Gésiers de poulet.', -1);
 
   await db.setSetting('objectif_mensuel', '150000');
   console.log('[démo] données de démonstration créées');
