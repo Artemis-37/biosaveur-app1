@@ -55,6 +55,14 @@ app.use('/api', (req, res, next) => {
   if (!status.started || status.db === 'ok') return next();
   res.status(503).json({ error: 'Le service démarre, réessayez dans un instant.' });
 });
+// Mode démo : recale les dates des données fictives une fois par jour.
+let demoDay = '';
+app.use('/api', (req, res, next) => {
+  const day = new Date().toISOString().slice(0, 10);
+  if (!config.seedDemo || demoDay === day) return next();
+  demoDay = day;
+  require('./seed').rebaseDemo().then(() => next(), (e) => { console.error('[démo]', e.message); next(); });
+});
 app.use('/api', require('./routes/public').router);
 app.use('/api/client', require('./routes/client'));
 app.use('/api/driver', require('./routes/driver'));

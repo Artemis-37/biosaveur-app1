@@ -185,12 +185,64 @@ async function seedDemo() {
   console.log('[démo] données de démonstration créées');
 }
 
+
+// --- démo : dates toujours d'actualité ---------------------------------------------------------
+// Les données fictives sont créées à une date donnée. Pour que « la tournée du jour », les commandes
+// d'aujourd'hui, etc. restent cohérentes, on décale toutes les dates du nombre de jours écoulés.
+async function rebaseDemo() {
+  const today = isoDate();
+  let anchor = await db.getSetting('demo_anchor');
+  if (!anchor) {
+    const a = await db.one("SELECT created_at::date::text AS d FROM notifications WHERE body='Votre commande est en route.' ORDER BY id LIMIT 1");
+    anchor = a ? a.d : today;
+  }
+  const n = Math.round((Date.parse(today) - Date.parse(anchor)) / 86400000);
+  if (n > 0) {
+    await db.tx(async (c) => {
+      const iv = `${n} days`;
+      await c.query('UPDATE orders SET day = day + $1::interval, created_at = created_at + $1::interval, delivered_at = delivered_at + $1::interval', [iv]);
+      await c.query('UPDATE cotisations SET created_at = created_at + $1::interval', [iv]);
+      await c.query('UPDATE cotisation_payments SET created_at = created_at + $1::interval', [iv]);
+      await c.query('UPDATE messages SET created_at = created_at + $1::interval', [iv]);
+      await c.query('UPDATE notifications SET created_at = created_at + $1::interval', [iv]);
+      await c.query('UPDATE products SET slaughter_date = slaughter_date + $1::interval', [iv]);
+      await c.query('UPDATE users SET created_at = created_at + $1::interval WHERE demo', [iv]);
+    });
+    console.log(`[démo] dates décalées de ${n} jour(s)`);
+  }
+  await db.setSetting('demo_anchor', today);
+}
+
+// --- démo : photos illustrées des produits -------------------------------------------------------
+const PHOTO_COLORS = { entier: ['#fde7b0', '#d98324'], decoupes: ['#ffd9cc', '#c8472c'], packs: ['#d7f0c2', '#2f8f1e'], fume: ['#e6d3c0', '#6d4426'], abats: ['#f3d0d6', '#a23b52'], evenements: ['#dcd6f5', '#5a49b5'] };
+function photoSvg(name, cat) {
+  const [bg, fg] = PHOTO_COLORS[cat] || PHOTO_COLORS.entier;
+  const esc = (s) => String(s).replace(/[<>&"]/g, '');
+  const words = esc(name).split(' '); const l1 = []; const l2 = []; let len = 0;
+  for (const w of words) { (len + w.length < 17 ? l1 : l2).push(w); len += w.length + 1; }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect width="400" height="300" fill="${bg}"/>` +
+    `<ellipse cx="200" cy="262" rx="130" ry="14" fill="${fg}" opacity=".18"/>` +
+    `<ellipse cx="200" cy="150" rx="105" ry="78" fill="${fg}"/><ellipse cx="200" cy="140" rx="88" ry="60" fill="#fff" opacity=".22"/>` +
+    `<ellipse cx="108" cy="178" rx="26" ry="14" fill="${fg}" transform="rotate(-28 108 178)"/><ellipse cx="292" cy="178" rx="26" ry="14" fill="${fg}" transform="rotate(28 292 178)"/>` +
+    `<circle cx="262" cy="92" r="26" fill="${fg}"/><circle cx="270" cy="86" r="4" fill="#fff"/>` +
+    `<text x="200" y="${l2.length ? 36 : 44}" text-anchor="middle" font-family="Arial,sans-serif" font-size="24" font-weight="700" fill="#103d3a">${l1.join(' ')}</text>` +
+    (l2.length ? `<text x="200" y="64" text-anchor="middle" font-family="Arial,sans-serif" font-size="24" font-weight="700" fill="#103d3a">${l2.join(' ')}</text>` : '') +
+    `</svg>`;
+}
+async function seedDemoPhotos() {
+  const list = await db.many("SELECT id, name, category FROM products WHERE image_url = '' ORDER BY id");
+  for (const p of list) {
+    const img = await db.one('INSERT INTO images(mime,data) VALUES ($1,$2) RETURNING id', ['image/svg+xml', Buffer.from(photoSvg(p.name, p.category))]);
+    await db.query('UPDATE products SET image_url=$2 WHERE id=$1', [p.id, `/api/images/${img.id}`]);
+  }
+}
+
 async function seed() {
   await seedProducts();
   if (config.admin.phone && config.admin.password) {
     await ensureUser({ role: 'admin', name: config.admin.name, phone: config.admin.phone, password: config.admin.password });
   }
-  if (config.seedDemo) await seedDemo();
+  if (config.seedDemo) { await seedDemo(); await seedDemoPhotos(); await rebaseDemo(); }
 }
 
-module.exports = { seed, ensureUser, DEMO_ACCOUNTS, DEMO_PASSWORD };
+module.exports = { seed, rebaseDemo, ensureUser, DEMO_ACCOUNTS, DEMO_PASSWORD };
