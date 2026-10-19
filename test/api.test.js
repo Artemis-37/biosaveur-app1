@@ -187,3 +187,22 @@ test('partenaire : clients apportés, commission et versement', async () => {
   assert.equal((await c('GET', '/partner/overview')).status, 403);
   assert.equal((await c('GET', '/supplier/overview')).status, 403);
 });
+
+test('photo : téléversement admin, lecture publique, refus pour un client', async () => {
+  const png = 'data:image/png;base64,' + Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), Buffer.alloc(200, 1)]).toString('base64');
+  const c = agent();
+  await c('POST', '/auth/login', { phone: '0700000001', password: 'demo1234' });
+  assert.equal((await c('POST', '/admin/upload', { data: png })).status, 403);
+  const admin = agent();
+  await admin('POST', '/auth/login', { phone: '0700000000', password: 'demo1234' });
+  assert.equal((await admin('POST', '/admin/upload', { data: 'data:image/png;base64,AAAA' })).status, 400);
+  assert.equal((await admin('POST', '/admin/upload', { data: 'data:text/html;base64,PGI+' })).status, 400);
+  const r = await admin('POST', '/admin/upload', { data: png });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const img = await fetch(base + r.body.url.replace('/api', ''));
+  assert.equal(img.status, 200);
+  assert.equal(img.headers.get('content-type'), 'image/png');
+  const p = (await admin('GET', '/admin/products')).body[0];
+  assert.equal((await admin('PUT', `/admin/products/${p.id}`, { image_url: r.body.url })).status, 200);
+  assert.equal((await admin('GET', `/products/${p.id}`)).body.image_url, r.body.url);
+});

@@ -78,6 +78,19 @@ r.put('/users/:id/active', h(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// --- photos ---
+r.post('/upload', h(async (req, res) => {
+  const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(req.body.data || ''));
+  if (!m) throw bad('Image invalide (JPEG, PNG ou WebP).');
+  const buf = Buffer.from(m[2], 'base64');
+  if (buf.length < 100 || buf.length > 700 * 1024) throw bad('Image trop lourde (700 Ko maximum).');
+  const sig = buf.subarray(0, 4).toString('hex');
+  const ok = (m[1] === 'image/jpeg' && sig.startsWith('ffd8ff')) || (m[1] === 'image/png' && sig === '89504e47') || (m[1] === 'image/webp' && buf.subarray(0, 4).toString() === 'RIFF');
+  if (!ok) throw bad('Le fichier n’est pas une image valide.');
+  const img = await db.one('INSERT INTO images(mime,data,created_by) VALUES ($1,$2,$3) RETURNING id', [m[1], buf, req.user.id]);
+  res.json({ url: `/api/images/${img.id}` });
+}));
+
 // --- équipe (livreurs, admins) ---
 r.get('/staff', h(async (req, res) => {
   res.json(await db.many("SELECT id,role,name,company,phone,active,created_at,last_active,commission_rate FROM users WHERE role IN ('livreur','admin','fournisseur','partenaire') ORDER BY role, name"));
@@ -181,7 +194,7 @@ function productFields(b, cur = {}) {
     options: opts && opts.length ? opts : ['Entier'],
     tag: pick('tag', (v) => str(v, 30)),
     flash: pick('flash', (v) => !!v),
-    image_url: pick('image_url', (v) => (/^https:\/\//.test(str(v, 500)) ? str(v, 500) : '')),
+    image_url: pick('image_url', (v) => (/^(https:\/\/|\/api\/images\/\d+$)/.test(str(v, 500)) ? str(v, 500) : '')),
     description: pick('description', (v) => str(v, 2000)),
     stock: pick('stock', (v) => Math.max(0, int(v))),
     threshold: pick('threshold', (v) => Math.max(0, int(v))),

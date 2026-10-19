@@ -193,7 +193,8 @@
       '<div class="form-grid">' + f('stock', 'Stock', 'number', ' min="0"') + f('threshold', 'Seuil d’alerte', 'number', ' min="0"') + '</div>' +
       '<div class="form-grid">' + f('supplier', 'Fournisseur (nom affiché)') + f('lead_time', 'Délai d’approvisionnement') + '</div>' +
       '<div class="field"><label for="pe-sid">Compte fournisseur lié</label><select id="pe-sid" name="supplier_id"><option value="">— aucun —</option>' + (AV.suppliers || []).map(function (u) { return '<option value="' + u.id + '"' + (p.supplier_id === u.id ? ' selected' : '') + '>' + esc(u.company || u.name) + '</option>'; }).join('') + '</select></div>' +
-      '<div class="form-grid">' + f('tag', 'Étiquette (Halal, Promo…)') + f('image_url', 'Photo (lien https)') + '</div>' +
+      '<div class="form-grid">' + f('tag', 'Étiquette (Halal, Promo…)') + '<div class="field"><label for="pe-image_url">Photo (lien https)</label><input id="pe-image_url" name="image_url" type="text" value="' + esc(p.image_url || '') + '"></div></div>' +
+      '<div class="field"><div class="row" style="gap:12px;align-items:center"><img id="pe-prev" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:10px;background:#eef2f0' + (p.image_url ? '' : ';display:none') + '" src="' + esc(App.imgUrl(p.image_url || '')) + '"><label class="btn o sm" for="pe-file" style="cursor:pointer">Téléverser une photo</label><input id="pe-file" type="file" accept="image/*" hidden data-chg="photoPick"><span class="xs muted" id="pe-st">JPEG, PNG ou WebP · redimensionnée automatiquement</span></div></div>' +
       '<div class="field"><label for="pe-desc">Description</label><textarea id="pe-desc" name="description">' + esc(p.description) + '</textarea></div>' +
       '<strong class="small" style="color:var(--vf)">Traçabilité</strong>' +
       '<div class="form-grid">' + f('lot_code', 'Code lot') + f('farm', 'Ferme d’origine') + '</div>' +
@@ -202,6 +203,28 @@
       '<label class="chk"><input type="checkbox" name="flash"' + (p.flash ? ' checked' : '') + '> Offre flash (poulet du jour)</label>' +
       '<label class="chk"><input type="checkbox" name="visible"' + (p.visible ? ' checked' : '') + '> Visible dans la boutique</label>' +
       '<button class="btn p" type="submit">Enregistrer</button><button class="linkbtn" type="button" data-act="closeM">Annuler</button></form>');
+  };
+  // Redimensionne la photo dans le navigateur (800 px max, JPEG) puis l'envoie au serveur.
+  App.A.photoPick = function (d, el) {
+    var f = el.files && el.files[0], st = document.getElementById('pe-st');
+    if (!f) return;
+    st.textContent = 'Envoi en cours…';
+    var img = new Image(), url = URL.createObjectURL(f);
+    img.onerror = function () { URL.revokeObjectURL(url); st.textContent = 'Image illisible.'; };
+    img.onload = function () {
+      var k = Math.min(1, 800 / Math.max(img.width, img.height)), cv = document.createElement('canvas');
+      cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+      var cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url);
+      var q = 0.85, data = cv.toDataURL('image/jpeg', q);
+      while (data.length > 900000 && q > 0.4) { q -= 0.15; data = cv.toDataURL('image/jpeg', q); }
+      App.post('/admin/upload', { data: data }).then(function (r) {
+        document.getElementById('pe-image_url').value = r.url;
+        var pv = document.getElementById('pe-prev'); pv.src = App.imgUrl(r.url); pv.style.display = '';
+        st.textContent = 'Photo prête. Cliquez sur Enregistrer.';
+      }).catch(function (e) { st.textContent = e.message || 'Échec de l’envoi.'; });
+    };
+    img.src = url;
   };
   App.F.prodSave = function (fd, form) {
     var b = {}; fd.forEach(function (v, k) { b[k] = v; });

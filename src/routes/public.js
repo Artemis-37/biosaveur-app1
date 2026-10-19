@@ -126,4 +126,12 @@ r.post('/auth/logout', (req, res) => {
   res.json({ ok: true });
 });
 
+// Photos téléversées (publiques, mises en cache longtemps : une photo ne change jamais).
+r.get('/images/:id', h(async (req, res) => {
+  const img = await db.one('SELECT mime, data FROM images WHERE id=$1', [Number(req.params.id) || 0]);
+  if (!img) throw notFound('Image introuvable.');
+  res.set({ 'Content-Type': img.mime, 'Cache-Control': 'public, max-age=31536000, immutable', 'Cross-Origin-Resource-Policy': 'cross-origin' });
+  res.send(img.data);
+}));
+
 module.exports = { router: r, publicUser, COMMUNES };

@@ -76,6 +76,8 @@
     if (t === undefined) return App.store.get('token', null);
     App.store.set('token', t);
   };
+  // Les photos téléversées sont servies par l'API : en appli native, il faut préfixer l'adresse du serveur.
+  App.imgUrl = function (u) { return /^\/api\//.test(u || '') ? App.apiBase + u : u; };
   App.api = function (method, url, body) {
     var opt = { method: method, headers: { 'X-Requested-With': 'biosaveur' }, credentials: App.apiBase ? 'omit' : 'same-origin' };
     var tk = App.token(); if (tk) opt.headers.Authorization = 'Bearer ' + tk;

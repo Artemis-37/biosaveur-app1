@@ -200,3 +200,12 @@ CREATE TABLE IF NOT EXISTS partner_payouts (
   created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- v3 : photos téléversées depuis le back-office
+CREATE TABLE IF NOT EXISTS images (
+  id          SERIAL PRIMARY KEY,
+  mime        TEXT NOT NULL,
+  data        BYTEA NOT NULL,
+  created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);

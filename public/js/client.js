@@ -91,7 +91,7 @@
   /* ---------- produits ---------- */
   function pct(p) { return p.old_price ? Math.round((1 - p.price / p.old_price) * 100) : 0; }
   function art(p, big) {
-    if (p.image_url) return '<img src="' + esc(p.image_url) + '" alt="" loading="lazy">';
+    if (p.image_url) return '<img src="' + esc(App.imgUrl(p.image_url)) + '" alt="" loading="lazy">';
     return '<svg class="art" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (big ? 1.1 : 1.3) + '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + App.P[catOf(p.category).icon] + '</svg>';
   }
   App.prodArt = art;
