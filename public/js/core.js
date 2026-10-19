@@ -78,6 +78,23 @@
   };
   // Les photos téléversées sont servies par l'API : en appli native, il faut préfixer l'adresse du serveur.
   App.imgUrl = function (u) { return /^\/api\//.test(u || '') ? App.apiBase + u : u; };
+  // Charge une photo choisie, la redimensionne (côté max) et renvoie une « data URL » JPEG compressée.
+  App.pickImage = function (file, maxPx, maxLen) {
+    return new Promise(function (ok, ko) {
+      var img = new Image(), url = URL.createObjectURL(file);
+      img.onerror = function () { URL.revokeObjectURL(url); ko(new Error('Image illisible.')); };
+      img.onload = function () {
+        var k = Math.min(1, maxPx / Math.max(img.width, img.height)), cv = document.createElement('canvas');
+        cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+        var cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(img, 0, 0, cv.width, cv.height);
+        URL.revokeObjectURL(url);
+        var q = 0.85, data = cv.toDataURL('image/jpeg', q);
+        while (data.length > (maxLen || 900000) && q > 0.4) { q -= 0.15; data = cv.toDataURL('image/jpeg', q); }
+        ok(data);
+      };
+      img.src = url;
+    });
+  };
   App.api = function (method, url, body) {
     var opt = { method: method, headers: { 'X-Requested-With': 'biosaveur' }, credentials: App.apiBase ? 'omit' : 'same-origin' };
     var tk = App.token(); if (tk) opt.headers.Authorization = 'Bearer ' + tk;

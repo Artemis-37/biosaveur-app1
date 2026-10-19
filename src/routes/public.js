@@ -1,6 +1,7 @@
 'use strict';
 // Routes publiques : configuration, catalogue, inscription et connexion.
 const express = require('express');
+const { newQrToken } = require('../loyalty');
 const config = require('../config');
 const db = require('../db');
 const cinetpay = require('../cinetpay');
@@ -17,7 +18,7 @@ function publicUser(u) {
   return {
     id: u.id, role: u.role, name: u.name, phone: u.phone, commune: u.commune, address: u.address,
     landmark: u.landmark, lat: u.lat, lng: u.lng, referral_code: u.referral_code, points: u.points,
-    created_at: u.created_at, company: u.company || '',
+    created_at: u.created_at, company: u.company || '', email: u.email || '', avatar_url: u.avatar_url || '',
   };
 }
 
@@ -79,11 +80,14 @@ r.post('/auth/register', h(async (req, res) => {
   const commune = COMMUNES.includes(req.body.commune) ? req.body.commune : '';
   const address = str(req.body.address, 200);
   const ref = str(req.body.referral, 20).toUpperCase();
+  const email = str(req.body.email, 120).toLowerCase();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw bad('Adresse e-mail invalide.');
   if (name.length < 2) throw bad('Indiquez votre nom.');
   if (!/^\d{10}$/.test(phone)) throw bad('Numéro de téléphone invalide (10 chiffres).');
   if (password.length < 6) throw bad('Le mot de passe doit faire au moins 6 caractères.');
   throttle(`reg:${req.ip}`);
   if (await db.one('SELECT 1 FROM users WHERE phone=$1', [phone])) throw bad('Un compte existe déjà avec ce numéro. Connectez-vous.');
+  if (email && await db.one('SELECT 1 FROM users WHERE lower(email)=$1', [email])) throw bad('Un compte existe déjà avec cet e-mail. Connectez-vous.');
 
   let referrer = null;
   if (ref) {
@@ -92,9 +96,9 @@ r.post('/auth/register', h(async (req, res) => {
   }
   const u = await db.tx(async (c) => {
     const user = (await c.query(
-      `INSERT INTO users(role,name,phone,password_hash,commune,address,referral_code,referred_by)
-       VALUES ('client',$1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [name, phone, await hash(password), commune, address, `BSV-${code(4)}`, referrer ? referrer.id : null]
+      `INSERT INTO users(role,name,phone,password_hash,commune,address,referral_code,referred_by,email,qr_token)
+       VALUES ('client',$1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [name, phone, await hash(password), commune, address, `BSV-${code(4)}`, referrer ? referrer.id : null, email || null, newQrToken()]
     )).rows[0];
     if (referrer && referrer.role === 'client') {
       await c.query('UPDATE users SET points = points + $2 WHERE id=$1', [referrer.id, config.shop.referralPoints]);
@@ -110,13 +114,30 @@ r.post('/auth/register', h(async (req, res) => {
 }));
 
 r.post('/auth/login', h(async (req, res) => {
-  const phone = normPhone(req.body.phone);
-  throttle(`login:${phone}`);
-  const u = await db.one('SELECT * FROM users WHERE phone=$1 AND active', [phone]);
-  if (!u || !(await check(String(req.body.password || ''), u.password_hash))) throw bad('Numéro ou mot de passe incorrect.');
-  attempts.delete(`login:${phone}`);
+  const ident = String(req.body.phone || req.body.identifier || '').trim();
+  const byEmail = ident.includes('@');
+  const key = byEmail ? ident.toLowerCase() : normPhone(ident);
+  throttle(`login:${key}`);
+  const u = byEmail
+    ? await db.one('SELECT * FROM users WHERE lower(email)=$1 AND active', [key])
+    : await db.one('SELECT * FROM users WHERE phone=$1 AND active', [key]);
+  if (!u || !(await check(String(req.body.password || ''), u.password_hash))) throw bad('Identifiant ou mot de passe incorrect.');
+  attempts.delete(`login:${key}`);
   await db.query('UPDATE users SET last_active=now() WHERE id=$1', [u.id]);
   await audit(u.id, 'connexion');
+  const token = setSession(res, u);
+  res.json({ user: publicUser(u), token });
+}));
+
+// Connexion par QR code personnel (clients uniquement).
+r.post('/auth/qr', h(async (req, res) => {
+  const t = String(req.body.token || '').replace(/^BSVQ:/, '').trim();
+  throttle(`qr:${req.ip}`);
+  if (!/^[A-Za-z0-9]{24,48}$/.test(t)) throw bad('QR code non reconnu.');
+  const u = await db.one("SELECT * FROM users WHERE qr_token=$1 AND role='client' AND active", [t]);
+  if (!u) throw bad('QR code non reconnu ou remplacé. Connectez-vous avec votre mot de passe.');
+  await db.query('UPDATE users SET last_active=now() WHERE id=$1', [u.id]);
+  await audit(u.id, 'connexion par QR');
   const token = setSession(res, u);
   res.json({ user: publicUser(u), token });
 }));

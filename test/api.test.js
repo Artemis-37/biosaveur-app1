@@ -166,3 +166,77 @@ test('photo : téléversement admin, lecture publique, refus pour un client', as
   assert.equal((await admin('PUT', `/admin/products/${p.id}`, { image_url: r.body.url })).status, 200);
   assert.equal((await admin('GET', `/products/${p.id}`)).body.image_url, r.body.url);
 });
+
+test('client : e-mail, QR personnel, photo de profil, badges', async () => {
+  const c = agent();
+  const phone = `07${String(Date.now()).slice(-8)}`;
+  const email = `t${Date.now()}@exemple.com`;
+  let r = await c('POST', '/auth/register', { name: 'Qr Test', phone, password: 'secret12', commune: 'Cocody', address: 'Rue', email });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.user.email, email);
+  const byMail = agent();
+  r = await byMail('POST', '/auth/login', { phone: email.toUpperCase(), password: 'secret12' });
+  assert.equal(r.status, 200, 'connexion par e-mail');
+  r = await c('GET', '/client/me/qr');
+  assert.ok(r.body.token && r.body.svg.startsWith('<?xml') || r.body.svg.includes('<svg'));
+  const tok = r.body.token;
+  const viaQr = agent();
+  r = await viaQr('POST', '/auth/qr', { token: `BSVQ:${tok}` });
+  assert.equal(r.status, 200, 'connexion par QR');
+  assert.equal((await viaQr('POST', '/auth/qr', { token: 'BSVQ:inconnuinconnuinconnuinconnu' })).status, 400);
+  await c('POST', '/client/me/qr/regenerate');
+  assert.equal((await agent()('POST', '/auth/qr', { token: tok })).status, 400, 'ancien QR invalide');
+  const jpg = 'data:image/jpeg;base64,' + Buffer.concat([Buffer.from('ffd8ffe0', 'hex'), Buffer.alloc(300, 7)]).toString('base64');
+  r = await c('PUT', '/client/me/avatar', { data: jpg });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.match(r.body.avatar_url, /^\/api\/images\/\d+$/);
+  const l = (await c('GET', '/client/loyalty')).body;
+  assert.equal(l.badges.find((b) => b.key === 'bienvenue').earned, true);
+  assert.equal(l.badges.find((b) => b.key === 'premiere').earned, false);
+  const demo = agent();
+  await demo('POST', '/auth/login', { phone: '0700000001', password: 'demo1234' });
+  assert.ok((await demo('GET', '/client/loyalty')).body.earned >= 3, 'client démo : plusieurs badges');
+});
+
+test('admin : graphiques, calendrier, zones, annonces, comptes équipe, sauvegarde', async () => {
+  const admin = agent();
+  await admin('POST', '/auth/login', { phone: '0700000000', password: 'demo1234' });
+  const ov = (await admin('GET', '/admin/overview')).body;
+  assert.ok(ov.cotStatus.length > 0 && ov.evolution.length === 6);
+  const cal = (await admin('GET', `/admin/calendar?month=${today.slice(0, 7)}`)).body;
+  assert.ok(cal.days.length > 0, 'des livraisons dans le mois');
+  const zones = (await admin('GET', '/admin/zones')).body;
+  assert.ok(zones.length >= 3 && zones[0].clients > 0);
+  let r = await admin('POST', '/admin/announcements', { audience: 'tous', body: 'Promo poulet fermier samedi !' });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.ok(r.body.recipients >= 10);
+  assert.equal((await admin('POST', '/admin/announcements', { audience: 'nimporte', body: 'Message valide ici' })).status, 400);
+  const c = agent();
+  await c('POST', '/auth/login', { phone: '0700000001', password: 'demo1234' });
+  assert.ok((await c('GET', '/client/notifications')).body.some((n) => n.body.includes('Promo poulet fermier')));
+  assert.equal((await c('POST', '/admin/announcements', { audience: 'tous', body: 'Pirate message' })).status, 403);
+  const staff = (await admin('GET', '/admin/staff')).body;
+  const drv = staff.find((s) => s.phone === '0700000012');
+  r = await admin('PUT', `/admin/staff/${drv.id}`, { name: 'Awa Diallo (livreuse démo)', phone: '0700000012' });
+  assert.equal(r.status, 200);
+  assert.equal((await admin('PUT', `/admin/staff/${drv.id}`, { phone: '0700000002' })).status, 400, 'numéro déjà pris');
+  const bk = await fetch(base + '/admin/backup', { headers: { 'X-Requested-With': 'biosaveur', cookie: '' } });
+  assert.equal(bk.status, 401);
+  const raw = await (async () => { const a = agent(); await a('POST', '/auth/login', { phone: '0700000000', password: 'demo1234' }); return a('GET', '/admin/backup'); })();
+  assert.equal(raw.status, 200);
+  assert.ok(raw.body.tables.orders.length > 100);
+  assert.ok(!JSON.stringify(raw.body).includes('password_hash'), 'aucun hash de mot de passe');
+});
+
+test('push : clé publique, abonnement, envoi sans erreur', async () => {
+  const c = agent();
+  await c('POST', '/auth/login', { phone: '0700000001', password: 'demo1234' });
+  const k = (await c('GET', '/client/push/key')).body.key;
+  assert.ok(k && k.length > 60);
+  assert.equal((await c('POST', '/client/push/subscribe', { subscription: { endpoint: 'http://x', keys: {} } })).status, 400);
+  const r = await c('POST', '/client/push/subscribe', { subscription: { endpoint: 'https://127.0.0.1:1/fake', keys: { p256dh: 'BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM', auth: 'tBHItJI5svbpez7KI4CCXg' } } });
+  assert.equal(r.status, 200);
+  const admin = agent();
+  await admin('POST', '/auth/login', { phone: '0700000000', password: 'demo1234' });
+  assert.equal((await admin('POST', '/admin/announcements', { audience: 'tous', body: 'Test push sans erreur' })).status, 200);
+});

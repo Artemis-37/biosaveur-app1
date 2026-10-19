@@ -335,16 +335,23 @@
     });
   });
 
+  function avatar(u, size) {
+    var st = 'width:' + size + 'px;height:' + size + 'px;border-radius:50%;border:3px solid var(--j);flex-shrink:0;';
+    return u.avatar_url ? '<img src="' + esc(App.imgUrl(u.avatar_url)) + '" alt="" style="' + st + 'object-fit:cover;background:#fff">'
+      : '<span style="' + st + 'background:var(--vf);color:var(--j);display:flex;align-items:center;justify-content:center">' + ic('user', 'l') + '</span>';
+  }
+
   App.route('compte', function () {
     needLogin();
     var u = App.cfg.user;
     if (u.role !== 'client') return App.go(App.homeOf(u.role));
-    return Promise.all([App.get('/client/orders'), App.get('/client/notifications')]).then(function (res) {
+    return Promise.all([App.get('/client/orders'), App.get('/client/notifications'), App.get('/client/loyalty'), pushCard()]).then(function (res) {
+      var loy = res[2], pc = res[3];
       var cur = res[0].filter(function (o) { return ['confirmee', 'preparee', 'en_route'].indexOf(o.status) >= 0; })[0];
       var notifs = res[1], nn = notifs.filter(function (n) { return !n.read; }).length;
       return shell('compte',
         '<section class="card pad row" style="flex-wrap:wrap;gap:14px">' +
-        '<span style="width:60px;height:60px;border-radius:50%;background:var(--vf);border:3px solid var(--j);color:var(--j);display:flex;align-items:center;justify-content:center;flex-shrink:0">' + ic('user', 'l') + '</span>' +
+        avatar(u, 60) +
         '<div style="flex:1 1 180px"><h1 style="font-size:21px;color:var(--vf)">Bonjour, ' + esc(u.name.split(' ')[0]) + '</h1><span class="small muted">' + App.phone(u.phone) + ' · Code parrain ' + esc(u.referral_code) + '</span></div>' +
         '<a class="btn o sm" href="#/profil">' + ic('pin', 's') + 'Profil et adresse</a></section>' +
         '<div class="tiles">' +
@@ -353,7 +360,13 @@
         '<button data-act="nav" data-h="#/messages">' + ic('chat') + 'Messages' + (App.badges.messages ? '<span class="badge">' + App.badges.messages + '</span>' : '') + '</button>' +
         '<button data-act="nav" data-h="#/parrainage">' + ic('gift') + 'Parrainage</button>' +
         '<button data-act="nav" data-h="#/profil">' + ic('pin') + 'Profil</button>' +
+        '<button data-act="myQr">' + ic('list') + 'Mon QR</button>' +
         '<button data-act="logout">' + ic('logout') + 'Déconnexion</button></div>' +
+        pc +
+        '<section class="card pad stack" style="gap:10px"><div class="between"><h2 class="sec-t" style="font-size:17px">Mes badges de fidélité</h2><span class="pill ok">Niveau ' + esc(loy.level) + ' · ' + loy.earned + '/' + loy.total + '</span></div>' +
+        '<div class="badges">' + loy.badges.map(function (b) {
+          return '<div class="bdg' + (b.earned ? ' on' : '') + '" title="' + esc(b.desc) + '"><span class="bdg-i">' + (b.earned ? '★' : '☆') + '</span><strong>' + esc(b.label) + '</strong><span class="xs muted">' + (b.earned ? esc(b.desc) : b.progress + ' / ' + b.target + ' · ' + esc(b.desc)) + '</span></div>';
+        }).join('') + '</div></section>' +
         (u.lat == null ? '<div class="note">Placez votre domicile sur la carte pour que le livreur vous trouve facilement. <a href="#/profil">Placer ma position</a></div>' : '') +
         (cur ? '<section class="card pad stack" style="gap:12px"><div class="between"><h2 class="sec-t" style="font-size:17px">Commande en cours · ' + esc(cur.number) + '</h2><a class="linkbtn" href="#/commande/' + cur.id + '">QR et détails</a></div>' + tracker(cur) + '<div class="note info">' + App.fday(cur.day) + ' · ' + cur.slot + ' · présentez votre QR code au livreur.</div></section>' : '') +
         '<section class="card pad"><div class="between" style="margin-bottom:4px"><h2 class="sec-t" style="font-size:17px">Notifications</h2>' + (nn ? '<button class="linkbtn" data-act="readNotifs">Tout marquer comme lu</button>' : '') + '</div>' +
@@ -361,6 +374,40 @@
         '</section>');
     });
   });
+  App.A.myQr = function () {
+    App.get('/client/me/qr').then(function (q) {
+      App.modal('<h2 class="sec-t">Mon QR personnel</h2><div style="width:220px;max-width:100%;margin:0 auto">' + q.svg + '</div>' +
+        '<p class="small muted" style="text-align:center;margin:0">Scannez-le depuis « Se connecter avec mon QR » pour entrer sans mot de passe. Ne le partagez pas : il donne accès à votre compte.</p>' +
+        '<button class="btn o" data-act="qrRegen">Remplacer ce QR code</button><button class="linkbtn" type="button" data-act="closeM">Fermer</button>');
+    }).catch(App.err);
+  };
+  App.A.qrRegen = function () { if (window.confirm('L’ancien QR code ne fonctionnera plus. Continuer ?')) App.post('/client/me/qr/regenerate', {}).then(function () { App.modal(null); App.A.myQr(); }).catch(App.err); };
+  /* ---------- notifications push (navigateur) ---------- */
+  function pushOk() { return !App.native && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+  function b64(s) { var p = '='.repeat((4 - s.length % 4) % 4), r = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')), o = new Uint8Array(r.length); for (var i = 0; i < r.length; i++) o[i] = r.charCodeAt(i); return o; }
+  App.A.pushOn = function (d, el) {
+    el.disabled = true;
+    Notification.requestPermission().then(function (p) {
+      if (p !== 'granted') throw new Error('Notifications refusées. Autorisez-les dans les réglages du navigateur.');
+      return navigator.serviceWorker.register('/sw.js').then(function () { return navigator.serviceWorker.ready; });
+    }).then(function (reg) {
+      return App.get('/client/push/key').then(function (k) { return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(k.key) }); });
+    }).then(function (sub) { return App.post('/client/push/subscribe', { subscription: sub.toJSON() }); })
+      .then(function () { App.toast('Notifications activées sur cet appareil.'); App.render(); }).catch(function (e) { el.disabled = false; App.err(e); });
+  };
+  App.A.pushOff = function () {
+    navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (sub) {
+      if (!sub) return; var ep = sub.endpoint; return sub.unsubscribe().then(function () { return App.post('/client/push/unsubscribe', { endpoint: ep }); });
+    }).then(function () { App.toast('Notifications désactivées.'); App.render(); }).catch(App.err);
+  };
+  function pushCard() {
+    if (!pushOk()) return Promise.resolve('');
+    if (Notification.permission === 'denied') return Promise.resolve('<div class="note small">Les notifications sont bloquées dans votre navigateur. Autorisez-les dans les réglages du site pour être prévenu des livraisons.</div>');
+    return navigator.serviceWorker.getRegistration('/sw.js').then(function (reg) { return reg ? reg.pushManager.getSubscription() : null; }).then(function (sub) {
+      return '<section class="card pad row" style="justify-content:space-between;flex-wrap:wrap;gap:10px"><span><strong>Notifications sur cet appareil</strong><br><span class="small muted">Soyez prévenu quand votre commande est en route, même appli fermée.</span></span>' +
+        (sub ? '<button class="btn o sm" data-act="pushOff">Désactiver</button>' : '<button class="btn p sm" data-act="pushOn">Activer</button>') + '</section>';
+    }, function () { return ''; });
+  }
   App.A.readNotifs = function () { App.post('/client/notifications/read').then(function () { App.badges.notifications = 0; App.render(); }); };
 
   App.route('cotisation', function () {
@@ -479,8 +526,10 @@
     return shell('profil',
       '<section class="card pad stack" style="gap:14px"><h1 class="sec-t">Profil et adresse</h1>' +
       '<form class="stack" style="gap:12px" data-form="profil">' +
+      '<div class="row" style="gap:14px;align-items:center" id="avrow">' + avatar(u, 72) + '<label class="btn o sm" for="av-file" style="cursor:pointer">Changer la photo</label><input id="av-file" type="file" accept="image/*" hidden data-chg="avatarPick">' + (u.avatar_url ? '<button class="linkbtn" type="button" data-act="avatarDel">Retirer</button>' : '') + '</div>' +
       '<div class="form-grid"><div class="field"><label for="pn">Nom complet</label><input id="pn" name="name" value="' + esc(u.name) + '" required maxlength="80"></div>' +
       '<div class="field"><label for="pt">Téléphone</label><input id="pt" value="' + App.phone(u.phone) + '" disabled></div></div>' +
+      '<div class="field"><label for="pe">E-mail (facultatif, sert aussi à se connecter)</label><input id="pe" name="email" type="email" value="' + esc(u.email || '') + '" maxlength="120" autocomplete="email"></div>' +
       '<div class="form-grid"><div class="field"><label for="pc">Commune</label><select id="pc" name="commune"><option value="">Choisir…</option>' + App.cfg.communes.map(function (x) { return '<option' + (u.commune === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></div>' +
       '<div class="field"><label for="pa">Adresse précise</label><input id="pa" name="address" value="' + esc(u.address) + '" required maxlength="200" placeholder="Quartier, rue, immeuble"></div></div>' +
       '<div class="field"><label for="pr">Point de repère pour le livreur</label><input id="pr" name="landmark" value="' + esc(u.landmark) + '" maxlength="200" placeholder="Ex. portail vert après la boulangerie"></div>' +
@@ -495,6 +544,12 @@
       '<div class="field"><label for="pw2">Nouveau mot de passe</label><input id="pw2" name="next" type="password" minlength="6" required autocomplete="new-password"></div>' +
       '<button class="btn o" type="submit" style="align-self:end">Modifier</button></form></section>');
   });
+  App.A.avatarPick = function (d, el) {
+    var f = el.files && el.files[0]; if (!f) return;
+    App.pickImage(f, 320, 250000).then(function (data) { return App.put('/client/me/avatar', { data: data }); })
+      .then(function (u) { App.cfg.user = u; App.toast('Photo de profil mise à jour.'); App.render(); }).catch(App.err);
+  };
+  App.A.avatarDel = function () { App.api('DELETE', '/client/me/avatar').then(function (u) { App.cfg.user = u; App.render(); }).catch(App.err); };
   App.A.locate = function () { if (App._locate) App._locate(); };
   App.F.profil = function (fd) {
     var b = {}; fd.forEach(function (v, k) { b[k] = v; });
@@ -511,13 +566,14 @@
       }).join('') + '</div></div>' : '';
     var suite = esc(r.q.suite || '');
     var body = mode === 'login'
-      ? '<form class="stack" style="gap:12px" data-form="login" data-suite="' + suite + '"><div class="field"><label for="lp">Numéro de téléphone</label><input id="lp" name="phone" inputmode="tel" autocomplete="tel" placeholder="07 00 00 00 00" required></div>' +
+      ? '<form class="stack" style="gap:12px" data-form="login" data-suite="' + suite + '"><div class="field"><label for="lp">Téléphone ou e-mail</label><input id="lp" name="phone" autocomplete="username" autocapitalize="off" placeholder="07 00 00 00 00 ou nom@exemple.com" required></div>' +
         '<div class="field"><label for="lw">Mot de passe</label><input id="lw" name="password" type="password" autocomplete="current-password" required></div>' +
-        '<button class="btn p" type="submit">Se connecter</button><span class="small muted">Mot de passe oublié ? Écrivez-nous sur WhatsApp, l’équipe le réinitialise.</span></form>'
+        '<button class="btn p" type="submit">Se connecter</button><button class="btn o" type="button" data-act="qrLogin">Se connecter avec mon QR</button><span class="small muted">Mot de passe oublié ? Écrivez-nous sur WhatsApp, l’équipe le réinitialise.</span></form>'
       : '<form class="stack" style="gap:12px" data-form="register" data-suite="' + suite + '"><div class="field"><label for="rn">Nom complet</label><input id="rn" name="name" autocomplete="name" required maxlength="80"></div>' +
         '<div class="field"><label for="rp">Numéro de téléphone</label><input id="rp" name="phone" inputmode="tel" autocomplete="tel" placeholder="07 00 00 00 00" required></div>' +
         '<div class="form-grid"><div class="field"><label for="rc">Commune</label><select id="rc" name="commune" required><option value="">Choisir…</option>' + App.cfg.communes.map(function (x) { return '<option>' + x + '</option>'; }).join('') + '</select></div>' +
         '<div class="field"><label for="ra">Adresse</label><input id="ra" name="address" required maxlength="200" placeholder="Quartier, rue"></div></div>' +
+        '<div class="field"><label for="re">E-mail (facultatif)</label><input id="re" name="email" type="email" autocomplete="email" maxlength="120"></div>' +
         '<div class="field"><label for="rw">Mot de passe (6 caractères min.)</label><input id="rw" name="password" type="password" minlength="6" autocomplete="new-password" required></div>' +
         '<div class="field"><label for="rr">Code de parrainage (facultatif)</label><input id="rr" name="referral" placeholder="BSV-XXXX" value="' + esc(r.q.parrain || '') + '"></div>' +
         '<button class="btn p" type="submit">Créer mon compte</button></form>';
@@ -529,6 +585,19 @@
       App.token(r.token); App.cfg.user = r.user;
       App.loadConfig().then(function () { App.go(App.homeOf(r.user.role)); App.toast('Connecté : ' + App.ROLE_LABEL[r.user.role] + ' (démo)'); });
     }).catch(App.err);
+  };
+  var qrScanner = null;
+  function stopQr() { var s = qrScanner; qrScanner = null; if (s) { s.stop().then(function () { s.clear(); }, function () {}); } }
+  App.A.qrLogin = function () {
+    App.modal('<h2 class="sec-t">Connexion par QR</h2><div id="qrl" class="scanbox"></div><span class="xs muted" id="qrls">Ouverture de la caméra…</span>' +
+      '<p class="small muted" style="margin:0">Votre QR personnel se trouve dans Compte → « Mon QR », sur un autre appareil connecté.</p><button class="linkbtn" type="button" data-act="closeM">Fermer</button>', stopQr);
+    if (!window.Html5Qrcode) { document.getElementById('qrls').textContent = 'Caméra indisponible sur cet appareil.'; return; }
+    qrScanner = new Html5Qrcode('qrl');
+    qrScanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: 220 }, function (text) {
+      if (!qrScanner) return;
+      stopQr();
+      App.post('/auth/qr', { token: String(text).trim() }).then(function (r) { App.modal(null); App.token(r.token); App.cfg.user = r.user; App.loadConfig().then(function () { App.go(App.homeOf(r.user.role)); }); }).catch(function (e) { App.modal(null); App.err(e); });
+    }, function () {}).catch(function () { var s = document.getElementById('qrls'); if (s) s.textContent = 'Caméra non autorisée.'; });
   };
   App.route('connexion', function (r) { return authPage('login', r); });
   App.route('inscription', function (r) { return authPage('register', r); });

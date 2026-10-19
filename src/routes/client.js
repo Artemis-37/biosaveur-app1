@@ -2,6 +2,8 @@
 // Espace client : profil, commandes, cotisation, parrainage, messages, notifications.
 const express = require('express');
 const QRCode = require('qrcode');
+const { saveImage } = require('../images');
+const { loyalty, newQrToken } = require('../loyalty');
 const config = require('../config');
 const db = require('../db');
 const services = require('../services');
@@ -25,12 +27,51 @@ r.put('/me', h(async (req, res) => {
   // Grand Abidjan seulement
   if (lat !== null && (lat < 5.1 || lat > 5.7 || lng === null || lng < -4.4 || lng > -3.6)) throw bad('Position hors de la zone de livraison (Grand Abidjan).');
   if (lat === null || lng === null) { lat = null; lng = null; }
+  const email = b.email === undefined ? (req.user.email || '') : str(b.email, 120).toLowerCase();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw bad('Adresse e-mail invalide.');
+  if (email && await db.one('SELECT 1 FROM users WHERE lower(email)=$1 AND id<>$2', [email, req.user.id])) throw bad('Cet e-mail est déjà utilisé.');
   const u = await db.one(
-    'UPDATE users SET name=$2, commune=$3, address=$4, landmark=$5, lat=$6, lng=$7 WHERE id=$1 RETURNING *',
-    [req.user.id, name, commune, address, landmark, lat, lng]
+    'UPDATE users SET name=$2, commune=$3, address=$4, landmark=$5, lat=$6, lng=$7, email=$8 WHERE id=$1 RETURNING *',
+    [req.user.id, name, commune, address, landmark, lat, lng, email || null]
   );
   res.json(publicUser(u));
 }));
+
+// Photo de profil (compressée côté navigateur).
+r.put('/me/avatar', h(async (req, res) => {
+  const url = await saveImage(req.body.data, req.user.id, 300);
+  const u = await db.one('UPDATE users SET avatar_url=$2 WHERE id=$1 RETURNING *', [req.user.id, url]);
+  res.json(publicUser(u));
+}));
+r.delete('/me/avatar', h(async (req, res) => {
+  const u = await db.one("UPDATE users SET avatar_url='' WHERE id=$1 RETURNING *", [req.user.id]);
+  res.json(publicUser(u));
+}));
+
+// QR code personnel : permet de se connecter sans saisir le mot de passe. Il peut être remplacé à tout moment.
+async function qrOf(user, regen) {
+  let t = user.qr_token;
+  if (!t || regen) { t = newQrToken(); await db.query('UPDATE users SET qr_token=$2 WHERE id=$1', [user.id, t]); }
+  return { token: t, svg: await QRCode.toString(`BSVQ:${t}`, { type: 'svg', margin: 1, color: { dark: '#103d3a', light: '#ffffff' } }) };
+}
+r.get('/me/qr', h(async (req, res) => res.json(await qrOf(req.user, false))));
+r.post('/me/qr/regenerate', h(async (req, res) => res.json(await qrOf(req.user, true))));
+
+// --- notifications push navigateur ---
+r.get('/push/key', h(async (req, res) => res.json({ key: await require('../push').publicKey() })));
+r.post('/push/subscribe', h(async (req, res) => {
+  const s = req.body.subscription || {};
+  if (!/^https:\/\//.test(s.endpoint || '') || !s.keys || !s.keys.p256dh || !s.keys.auth) throw bad('Abonnement invalide.');
+  await db.query(`INSERT INTO push_subs(user_id,endpoint,p256dh,auth) VALUES ($1,$2,$3,$4)
+    ON CONFLICT (endpoint) DO UPDATE SET user_id=$1, p256dh=$3, auth=$4`, [req.user.id, s.endpoint, s.keys.p256dh, s.keys.auth]);
+  res.json({ ok: true });
+}));
+r.post('/push/unsubscribe', h(async (req, res) => {
+  await db.query('DELETE FROM push_subs WHERE user_id=$1 AND endpoint=$2', [req.user.id, String(req.body.endpoint || '')]);
+  res.json({ ok: true });
+}));
+
+r.get('/loyalty', h(async (req, res) => res.json(await loyalty(req.user.id))));
 
 r.put('/me/password', h(async (req, res) => {
   const { current, next } = req.body;

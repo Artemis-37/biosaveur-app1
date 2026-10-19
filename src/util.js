@@ -73,6 +73,7 @@ function num(v) {
 
 async function notify(userId, body, client = db) {
   await client.query('INSERT INTO notifications(user_id, body) VALUES ($1,$2)', [userId, body]);
+  require('./push').sendPush(userId, body); // sans attendre
 }
 async function audit(userId, action, detail = '', client = db) {
   await client.query('INSERT INTO audit_log(user_id, action, detail) VALUES ($1,$2,$3)', [userId || null, action, detail]);

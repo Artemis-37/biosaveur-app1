@@ -181,6 +181,11 @@ async function seedDemo() {
   await note(ids.client, 'Versement de cotisation reçu : 4 000 FCFA.', -7);
   await note(ids.client, 'Votre commande est en route.', 0);
 
+  for (const [aud, body, n, off] of [
+    ['tous', 'Nouveau : le poulet braisé est disponible chaque samedi. Commandez avant vendredi 18h !', 11, -21],
+    ['inactifs', 'Vous nous manquez ! -10 % sur votre prochaine commande de poulet fermier cette semaine.', 2, -9],
+    ['cotisation_complete', 'Votre cotisation est complète : programmez votre livraison depuis l’appli.', 2, -3],
+  ]) await db.query('INSERT INTO announcements(audience,body,recipients,created_by,created_at) VALUES ($1,$2,$3,$4,$5)', [aud, body, n, ids.admin, addDays(off)]);
   await db.setSetting('objectif_mensuel', '150000');
   console.log('[démo] données de démonstration créées');
 }
@@ -203,6 +208,7 @@ async function rebaseDemo() {
       await c.query('UPDATE orders SET day = day + $1::interval, created_at = created_at + $1::interval, delivered_at = delivered_at + $1::interval', [iv]);
       await c.query('UPDATE cotisations SET created_at = created_at + $1::interval', [iv]);
       await c.query('UPDATE cotisation_payments SET created_at = created_at + $1::interval', [iv]);
+      await c.query('UPDATE announcements SET created_at = created_at + $1::interval', [iv]);
       await c.query('UPDATE messages SET created_at = created_at + $1::interval', [iv]);
       await c.query('UPDATE notifications SET created_at = created_at + $1::interval', [iv]);
       await c.query('UPDATE products SET slaughter_date = slaughter_date + $1::interval', [iv]);

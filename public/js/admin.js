@@ -4,7 +4,7 @@
   var App = window.App, ic = App.ic, esc = App.esc, fcfa = App.fcfa, M = App.map;
 
   var MENU = [['apercu', 'home', 'Vue d’ensemble'], ['commandes', 'truck', 'Commandes & livraisons'], ['clients', 'users', 'Clients'], ['cotisations', 'coin', 'Cotisations & versements'],
-    ['stock', 'box', 'Produits & stock'], ['messages', 'chat', 'Messagerie'], ['equipe', 'user', 'Équipe'], ['cinetpay', 'card', 'Paiement CinetPay'], ['journal', 'list', 'Journal'], ['demo', 'list', 'Version démo']];
+    ['stock', 'box', 'Produits & stock'], ['calendrier', 'truck', 'Calendrier & zones'], ['messages', 'chat', 'Messagerie'], ['annonces', 'chat', 'SMS & annonces'], ['equipe', 'user', 'Équipe'], ['cinetpay', 'card', 'Paiement CinetPay'], ['journal', 'list', 'Journal'], ['demo', 'list', 'Version démo']];
   var ROLES = { admin: 'Administrateur', livreur: 'Livreur' };
   var AV = { filter: 'tous', day: App.iso(new Date()), status: '', thread: null, q: '' };
 
@@ -34,9 +34,34 @@
         '<section class="card pad stack chart" style="gap:10px"><div class="between"><h2 class="sec-t" style="font-size:16px">Cotisations collectées par mois</h2><button class="linkbtn" data-act="objectif">' + (d.objectif ? 'Objectif : ' + fcfa(d.objectif) : 'Fixer un objectif') + '</button></div>' + chart(d.months, d.objectif) +
         '<div class="legend"><span><i style="background:#103d3a"></i>Cotisations</span><span><i style="background:#25b810"></i>Ventes boutique</span>' + (d.objectif ? '<span><i style="background:#c08a00"></i>Objectif mensuel</span>' : '') + '</div></section>' +
         '<section class="card pad stack" style="gap:8px"><h2 class="sec-t" style="font-size:16px">À traiter</h2>' + (alerts || '<p class="muted small">Rien à signaler.</p>') + '</section></div>' +
+        '<div class="grid2" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">' +
+        '<section class="card pad stack chart" style="gap:10px"><h2 class="sec-t" style="font-size:16px">Statut des cotisations</h2>' + statusBars(d.cotStatus) + '</section>' +
+        '<section class="card pad stack chart" style="gap:10px"><h2 class="sec-t" style="font-size:16px">Clients et livraisons · 6 mois</h2>' + evoChart(d.evolution) + '<div class="legend"><span><i style="background:#103d3a"></i>Clients inscrits (cumul)</span><span><i style="background:#25b810"></i>Livraisons effectuées</span></div></section></div>' +
         '<section class="card pad"><div class="between" style="margin-bottom:6px"><h2 class="sec-t" style="font-size:16px">Commandes récentes</h2><a class="linkbtn" href="#/admin/commandes">Tout voir</a></div>' + ordersTable(d.recent, false) + '</section>', { messages: k.threads_non_lus, commandes: k.a_preparer, stock: d.low.length });
     });
   };
+  var COT_ST = { active: ['En cours', '#25b810'], complete: ['Complètes', '#c08a00'], livree: ['Livrées', '#103d3a'], annulee: ['Annulées', '#9aa5a1'] };
+  function statusBars(list) {
+    var tot = list.reduce(function (s, x) { return s + x.n; }, 0) || 1;
+    return list.map(function (x) {
+      var m = COT_ST[x.status] || [x.status, '#999'];
+      return '<div style="display:flex;flex-direction:column;gap:3px"><div class="between small"><span>' + m[0] + '</span><strong class="num">' + x.n + ' · ' + Math.round(x.n / tot * 100) + ' %</strong></div><div style="height:10px;border-radius:6px;background:#e9eeeb"><div style="height:10px;border-radius:6px;width:' + Math.round(x.n / tot * 100) + '%;background:' + m[1] + '"></div></div></div>';
+    }).join('') || '<p class="muted small">Aucune cotisation.</p>';
+  }
+  function evoChart(ev) {
+    var W = 560, H = 210, l = 36, b = 26, t = 12, r = 10, ih = H - b - t, iw = W - l - r, max = 1;
+    ev.forEach(function (x) { max = Math.max(max, x.clients, x.livraisons); });
+    var step = max > 200 ? 100 : max > 80 ? 50 : max > 30 ? 20 : max > 10 ? 10 : 2, top = Math.ceil(max / step) * step;
+    var X = function (i) { return l + (ev.length < 2 ? iw / 2 : iw * i / (ev.length - 1)); }, Y = function (v) { return t + ih - v / top * ih; };
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Évolution des clients et des livraisons">';
+    for (var v = 0; v <= top; v += step) s += '<line x1="' + l + '" x2="' + (W - r) + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="#e3e8e5"/><text x="' + (l - 6) + '" y="' + (Y(v) + 4) + '" text-anchor="end" font-size="11" fill="#56625e">' + v + '</text>';
+    [['clients', '#103d3a'], ['livraisons', '#25b810']].forEach(function (k) {
+      s += '<polyline fill="none" stroke="' + k[1] + '" stroke-width="2.5" points="' + ev.map(function (x, i) { return X(i) + ',' + Y(x[k[0]]); }).join(' ') + '"/>';
+      ev.forEach(function (x, i) { s += '<circle cx="' + X(i) + '" cy="' + Y(x[k[0]]) + '" r="3.5" fill="' + k[1] + '"><title>' + k[0] + ' : ' + x[k[0]] + '</title></circle>'; });
+    });
+    ev.forEach(function (x, i) { s += '<text x="' + X(i) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="11" fill="#56625e">' + App.MOIS[+x.month.slice(5, 7) - 1] + '</text>'; });
+    return s + '</svg>';
+  }
   function chart(months, obj) {
     var W = 560, H = 230, l = 58, b = 28, t = 10, r = 8;
     var max = obj || 0; months.forEach(function (x) { max = Math.max(max, x.cotisations, x.ventes); });
@@ -253,9 +278,10 @@
 
   S.equipe = function () {
     return App.get('/admin/staff').then(function (list) {
+      AV.staff = list;
       return frame('equipe', head('Équipe', 'Livreurs et administrateurs') +
         '<section class="card pad tbl"><table><thead><tr><th>Nom</th><th>Rôle</th><th>Téléphone</th><th>Dernière activité</th><th>État</th><th></th></tr></thead><tbody>' +
-        list.map(function (u) { return '<tr><td><strong>' + esc(u.name) + '</strong></td><td>' + esc(ROLES[u.role] || u.role) + (u.company ? '<br><span class="xs muted">' + esc(u.company) + '</span>' : '') + '</td><td class="num">' + App.phone(u.phone) + '</td><td>' + App.ago(u.last_active) + '</td><td>' + (u.active ? '<span class="pill ok">Actif</span>' : '<span class="pill neutral">Désactivé</span>') + '</td><td><div class="row" style="gap:6px"><button class="btn o sm" data-act="staffPw" data-id="' + u.id + '">Mot de passe</button>' + (u.id !== App.cfg.user.id ? '<button class="btn o sm" data-act="staffActive" data-id="' + u.id + '" data-v="' + (u.active ? '0' : '1') + '">' + (u.active ? 'Désactiver' : 'Réactiver') + '</button>' : '') + '</div></td></tr>'; }).join('') +
+        list.map(function (u) { return '<tr><td><strong>' + esc(u.name) + '</strong></td><td>' + esc(ROLES[u.role] || u.role) + (u.company ? '<br><span class="xs muted">' + esc(u.company) + '</span>' : '') + '</td><td class="num">' + App.phone(u.phone) + '</td><td>' + App.ago(u.last_active) + '</td><td>' + (u.active ? '<span class="pill ok">Actif</span>' : '<span class="pill neutral">Désactivé</span>') + '</td><td><div class="row" style="gap:6px"><button class="btn o sm" data-act="staffEdit" data-id="' + u.id + '">Modifier</button><button class="btn o sm" data-act="staffPw" data-id="' + u.id + '">Mot de passe</button>' + (u.id !== App.cfg.user.id ? '<button class="btn o sm" data-act="staffActive" data-id="' + u.id + '" data-v="' + (u.active ? '0' : '1') + '">' + (u.active ? 'Désactiver' : 'Réactiver') + '</button>' : '') + '</div></td></tr>'; }).join('') +
         '</tbody></table></section>' +
         '<section class="card pad stack" style="gap:12px"><h2 class="sec-t" style="font-size:16px">Ajouter un membre</h2><form class="form-grid" data-form="staffAdd">' +
         '<div class="field"><label for="sn">Nom</label><input id="sn" name="name" required></div>' +
@@ -318,9 +344,85 @@
     App.post('/admin/demo/purge', {}).then(function (r) { App.toast(r.deleted + ' comptes supprimés.'); App.render(); }).catch(App.err);
   };
 
+  /* ---------- calendrier des livraisons + zones ---------- */
+  S.calendrier = function (r) {
+    var month = r.args[1] || AV.month || App.iso(new Date()).slice(0, 7); AV.month = month;
+    return Promise.all([App.get('/admin/calendar?month=' + month), App.get('/admin/zones')]).then(function (res) {
+      var cal = res[0], zones = res[1], by = {}; cal.days.forEach(function (d) { by[d.day] = d; });
+      var y = +month.slice(0, 4), m = +month.slice(5, 7) - 1, first = new Date(Date.UTC(y, m, 1)), nd = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+      var lead = (first.getUTCDay() + 6) % 7, cells = '';
+      for (var i = 0; i < lead; i++) cells += '<div></div>';
+      for (var d = 1; d <= nd; d++) {
+        var iso = month + '-' + (d < 10 ? '0' : '') + d, x = by[iso], today = iso === App.iso(new Date());
+        cells += '<button class="cal-d' + (today ? ' today' : '') + (x ? ' has' : '') + '" data-act="calDay" data-day="' + iso + '" aria-label="' + iso + (x ? ', ' + x.total + ' livraison(s)' : '') + '"><b>' + d + '</b>' + (x ? '<span class="pill ok">' + x.total + '</span><span class="xs muted">' + (x.a_faire ? x.a_faire + ' à faire' : x.livrees + ' livrée(s)') + '</span>' : '') + '</button>';
+      }
+      var prev = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 7), next = new Date(Date.UTC(y, m + 1, 1)).toISOString().slice(0, 7);
+      var withPos = zones.filter(function (z) { return z.lat != null; });
+      App.after.push(function () {
+        var el = document.getElementById('zmap'); if (!el || !M.available()) return;
+        var map = M.create(el, { scroll: false }), pts = [];
+        withPos.forEach(function (z) {
+          var rad = 400 + z.clients * 260; pts.push([z.lat, z.lng]);
+          L.circle([z.lat, z.lng], { radius: rad, color: '#103d3a', weight: 1.5, fillColor: '#25b810', fillOpacity: .3 }).addTo(map).bindPopup('<strong>' + esc(z.commune) + '</strong><br>' + z.clients + ' client(s)<br>' + z.livraisons + ' livraison(s) sur 90 jours');
+        });
+        if (pts.length) map.fitBounds(pts, { padding: [30, 30], maxZoom: 12, animate: false }); else map.setView([App.cfg.depot.lat, App.cfg.depot.lng], 11, { animate: false });
+      });
+      return frame('calendrier', head('Calendrier & zones', 'Livraisons par jour et répartition des clients',
+        '<div class="row" style="gap:8px"><button class="btn o sm" data-act="calMonth" data-m="' + prev + '">‹</button><strong style="min-width:120px;text-align:center">' + App.MOIS[m] + ' ' + y + '</strong><button class="btn o sm" data-act="calMonth" data-m="' + next + '">›</button></div>') +
+        '<section class="card pad"><div class="cal-h">' + ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(function (j) { return '<span>' + j + '</span>'; }).join('') + '</div><div class="cal">' + cells + '</div><p class="xs muted" style="margin:8px 0 0">Touchez un jour pour voir ses livraisons.</p></section>' +
+        '<section class="card pad stack" style="gap:8px"><h2 class="sec-t" style="font-size:16px">Zones de livraison</h2>' + (withPos.length ? '<div id="zmap" class="lmap sm"></div>' : '<p class="muted small">Aucun client n’a encore placé sa position sur la carte.</p>') +
+        '<div class="tbl"><table><thead><tr><th>Commune</th><th>Clients</th><th>Livraisons (90 j)</th></tr></thead><tbody>' + zones.map(function (z) { return '<tr><td>' + esc(z.commune) + '</td><td class="num">' + z.clients + '</td><td class="num">' + z.livraisons + '</td></tr>'; }).join('') + '</tbody></table></div></section>');
+    });
+  };
+  App.A.calMonth = function (d) { AV.month = d.m; App.go('#/admin/calendrier/' + d.m); };
+  App.A.calDay = function (d) { AV.day = d.day; App.go('#/admin/commandes'); };
+
+  /* ---------- SMS & annonces groupées ---------- */
+  var AUD = { tous: 'Tous les clients', inactifs: 'Clients inactifs (30 jours)', cotisation_complete: 'Cotisation complète (à livrer)', cotisation_active: 'Cotisation en cours' };
+  S.annonces = function () {
+    return App.get('/admin/announcements').then(function (d) {
+      var opts = Object.keys(AUD).map(function (k) { return '<option value="' + k + '">' + AUD[k] + ' (' + d.counts[k] + ')</option>'; }).join('') +
+        App.cfg.communes.map(function (c) { return '<option value="commune:' + esc(c) + '">Commune : ' + esc(c) + '</option>'; }).join('');
+      return frame('annonces', head('SMS & annonces', 'Écrire à un groupe de clients') +
+        '<div class="note info small">Le message arrive dans les notifications de l’appli du client (et en notification push s’il l’a activée). L’envoi par SMS opérateur nécessite un contrat avec un fournisseur de SMS : il n’est pas branché pour l’instant.</div>' +
+        '<section class="card pad stack" style="gap:12px"><form class="stack" style="gap:12px" data-form="annonce">' +
+        '<div class="field"><label for="an-a">Destinataires</label><select id="an-a" name="audience">' + opts + '</select></div>' +
+        '<div class="field"><label for="an-b">Message (300 caractères max.)</label><textarea id="an-b" name="body" maxlength="300" required placeholder="Ex. Poulet fermier en promotion samedi : commandez avant vendredi 18h."></textarea></div>' +
+        '<button class="btn p" type="submit">Envoyer</button></form></section>' +
+        '<section class="card pad"><h2 class="sec-t" style="font-size:16px;margin-bottom:6px">Historique</h2>' + (d.history.length ? '<div class="tbl"><table><thead><tr><th>Date</th><th>Public</th><th>Message</th><th>Clients</th></tr></thead><tbody>' + d.history.map(function (a) {
+          return '<tr><td>' + App.fdt(a.created_at) + '</td><td class="small">' + esc(AUD[a.audience] || a.audience.replace('commune:', 'Commune : ')) + '</td><td>' + esc(a.body) + '</td><td class="num">' + a.recipients + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<p class="muted small">Aucune annonce envoyée.</p>') + '</section>');
+    });
+  };
+  App.F.annonce = function (fd, form) {
+    if (!window.confirm('Envoyer ce message ?')) return Promise.resolve();
+    return App.post('/admin/announcements', { audience: fd.get('audience'), body: fd.get('body') }).then(function (a) { form.reset(); App.toast('Message envoyé à ' + a.recipients + ' client(s).'); App.render(); });
+  };
+
+  /* ---------- modification d'un compte équipe + sauvegarde ---------- */
+  App.A.staffEdit = function (d) {
+    var u = (AV.staff || []).filter(function (x) { return String(x.id) === d.id; })[0]; if (!u) return;
+    App.modal('<h2 class="sec-t">Modifier le compte</h2><form class="stack" style="gap:12px" data-form="staffEdit" data-id="' + u.id + '">' +
+      '<div class="field"><label for="se-n">Nom</label><input id="se-n" name="name" value="' + esc(u.name) + '" required></div>' +
+      '<div class="field"><label for="se-p">Téléphone</label><input id="se-p" name="phone" value="' + esc(u.phone) + '" inputmode="tel" required></div>' +
+      (u.id !== App.cfg.user.id ? '<div class="field"><label for="se-r">Rôle</label><select id="se-r" name="role"><option value="livreur"' + (u.role === 'livreur' ? ' selected' : '') + '>Livreur</option><option value="admin"' + (u.role === 'admin' ? ' selected' : '') + '>Administrateur</option></select></div>' : '') +
+      '<button class="btn p" type="submit">Enregistrer</button><button class="linkbtn" type="button" data-act="closeM">Annuler</button></form>');
+  };
+  App.F.staffEdit = function (fd, form) {
+    var b = {}; fd.forEach(function (v, k) { b[k] = v; });
+    return App.put('/admin/staff/' + form.getAttribute('data-id'), b).then(function () { App.modal(null); App.toast('Compte modifié.'); App.render(); });
+  };
+  App.A.backup = function (d, el) {
+    el.disabled = true;
+    var opt = { headers: { 'X-Requested-With': 'biosaveur' }, credentials: App.apiBase ? 'omit' : 'same-origin' }, tk = App.token(); if (tk) opt.headers.Authorization = 'Bearer ' + tk;
+    fetch(App.apiBase + '/api/admin/backup', opt).then(function (r) { if (!r.ok) throw new Error('Sauvegarde impossible (erreur ' + r.status + ').'); return r.blob(); }).then(function (b) {
+      var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'biosaveur-sauvegarde-' + App.iso(new Date()) + '.json'; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000); App.toast('Sauvegarde téléchargée.');
+    }).catch(App.err).then(function () { el.disabled = false; });
+  };
+
   S.journal = function () {
     return App.get('/admin/audit').then(function (list) {
-      return frame('journal', head('Journal', 'Les 200 dernières actions de l’équipe') +
+      return frame('journal', head('Journal', 'Les 200 dernières actions de l’équipe', '<button class="btn o sm" data-act="backup">Télécharger la sauvegarde complète</button>') +
         '<section class="card pad"><div class="log">' + (list.length ? list.map(function (a) { return '<div><span class="muted">' + App.fdt(a.created_at) + '</span><strong>' + esc(a.name || 'Système') + '</strong><span>' + esc(a.action) + '</span><span class="muted">' + esc(a.detail) + '</span></div>'; }).join('') : '<span class="muted">Aucune action.</span>') + '</div></section>');
     });
   };

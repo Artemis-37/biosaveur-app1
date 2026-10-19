@@ -11,8 +11,8 @@
     opts = opts || {};
     var map = L.map(el, { zoomControl: true, scrollWheelZoom: opts.scroll !== false, zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false }).setView(opts.center || ABIDJAN, opts.zoom || 12);
     var t = App.cfg.map || {};
-    L.tileLayer(t.tiles || 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19, subdomains: 'abcd', attribution: t.attribution || '&copy; OpenStreetMap &copy; CARTO'
+    L.tileLayer(t.tiles || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, referrerPolicy: 'origin', attribution: t.attribution || '&copy; OpenStreetMap'
     }).addTo(map);
     App.cleanups.push(function () { try { map.off(); map.remove(); } catch (e) { /* déjà retirée */ } });
     setTimeout(function () { if (map._container && map._container.isConnected) map.invalidateSize(); }, 50);

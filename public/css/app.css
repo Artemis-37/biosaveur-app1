@@ -405,3 +405,17 @@ html.native footer.cf{display:none}
 .demo-role strong{color:var(--vf);font-size:14px}
 .demo-role code{font-size:11px;margin-top:4px}
 .demo-role:hover{border-color:var(--vf);background:var(--pale)}
+
+/* badges de fidélité */
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.bdg{display:flex;flex-direction:column;gap:3px;padding:12px;border:1.5px dashed #c9d3cf;border-radius:12px;opacity:.7}
+.bdg.on{border:1.5px solid var(--j);background:#fbfde0;opacity:1}
+.bdg-i{font-size:22px;color:#b8a400}
+
+/* calendrier admin */
+.cal-h,.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cal-h span{text-align:center;font-size:12px;font-weight:700;color:#56625e}
+.cal-d{min-height:66px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px;border:1.5px solid #e3e8e5;border-radius:10px;background:#fff;text-align:left;cursor:pointer}
+.cal-d.has{border-color:var(--vf);background:#f4faf2}
+.cal-d.today{outline:2px solid var(--j)}
+@media (max-width:600px){.cal-d{min-height:54px;padding:4px}.cal-d .xs{display:none}}

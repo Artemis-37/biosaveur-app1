@@ -183,3 +183,30 @@ CREATE TABLE IF NOT EXISTS images (
   created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- v4 : e-mail, photo de profil, QR personnel de connexion
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_key ON users (lower(email)) WHERE email IS NOT NULL AND email <> '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS qr_token TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS users_qr_token_key ON users (qr_token) WHERE qr_token IS NOT NULL;
+
+-- v5 : annonces groupées (SMS / notifications)
+CREATE TABLE IF NOT EXISTS announcements (
+  id          SERIAL PRIMARY KEY,
+  audience    TEXT NOT NULL,
+  body        TEXT NOT NULL,
+  recipients  INTEGER NOT NULL DEFAULT 0,
+  created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- v6 : abonnements aux notifications push navigateur
+CREATE TABLE IF NOT EXISTS push_subs (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  endpoint   TEXT NOT NULL UNIQUE,
+  p256dh     TEXT NOT NULL,
+  auth       TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

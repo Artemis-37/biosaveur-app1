@@ -11,7 +11,13 @@ boutique de poulet halal et traçable, cotisation poulet, livraisons suivies sur
 | **Livreur** | Tournée du jour sur carte avec ordre de passage, distance et temps estimés, navigation Google Maps / Waze vers la position GPS exacte du client, départ en livraison, confirmation de remise en scannant le QR du client (caméra) ou en saisissant son code. |
 | **Administrateur** | Vue d'ensemble (indicateurs, graphique de collecte, alertes), commandes et livraisons (statuts, attribution des livreurs, carte du jour), clients (actifs / inactifs, relance), cotisations et saisie des versements, produits et stock, messagerie, équipe (comptes livreurs et admins), réglages CinetPay, journal des actions. |
 
-Technique : Node.js 20+, Express, PostgreSQL, interface sans framework (HTML/CSS/JS), cartes Leaflet sur fonds OpenStreetMap / CARTO.
+Technique : Node.js 20+, Express, PostgreSQL, interface sans framework (HTML/CSS/JS), cartes Leaflet sur fonds OpenStreetMap.
+
+## Fonctions
+
+- **Client** : inscription et connexion (téléphone ou e-mail, ou QR personnel), cotisation poulet, commandes, suivi + QR de remise, traçabilité, profil avec photo, messagerie, notifications (dont push navigateur), parrainage, badges de fidélité.
+- **Livreur** : tournée du jour, carte et navigation, scan du QR à la remise.
+- **Administrateur** : vue d'ensemble et graphiques, clients (inactifs), cotisations, commandes, calendrier et zones de livraison, stock et fournisseurs (quantités à commander, délai d'arrivée), messagerie, annonces groupées, équipe, CinetPay, journal et sauvegarde complète (JSON).
 
 ## Lancer en local
 

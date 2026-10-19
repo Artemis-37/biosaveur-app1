@@ -6,7 +6,9 @@ const db = require('../db');
 const cinetpay = require('../cinetpay');
 const services = require('../services');
 const { need, hash } = require('../auth');
+const { COMMUNES } = require('./public');
 const { ensureUser } = require('../seed');
+const { saveImage } = require('../images');
 const { h, bad, notFound, int, str, normPhone, notify, audit, fcfa } = require('../util');
 
 const CATS = ['entier', 'decoupes', 'packs', 'fume', 'abats', 'evenements'];
@@ -32,11 +34,17 @@ r.get('/overview', h(async (req, res) => {
       coalesce((SELECT sum(total) FROM orders o WHERE o.paid AND o.kind='commande' AND o.status <> 'annulee' AND date_trunc('month', o.created_at)=m),0)::int AS ventes
     FROM generate_series(date_trunc('month', now()) - interval '5 months', date_trunc('month', now()), interval '1 month') m
     ORDER BY m`);
+  const cotStatus = await db.many("SELECT status, count(*)::int AS n FROM cotisations GROUP BY status");
+  const evolution = await db.many(`
+    SELECT to_char(m, 'YYYY-MM') AS month,
+      (SELECT count(*) FROM users u WHERE u.role='client' AND u.created_at < m + interval '1 month')::int AS clients,
+      (SELECT count(*) FROM orders o WHERE o.status='livree' AND date_trunc('month', o.delivered_at)=m)::int AS livraisons
+    FROM generate_series(date_trunc('month', now()) - interval '5 months', date_trunc('month', now()), interval '1 month') m ORDER BY m`);
   const objectif = int(await db.getSetting('objectif_mensuel', '0'));
   const recent = await db.many(`SELECT o.id,o.number,o.kind,o.day,o.slot,o.status,o.total,o.paid,o.pay_method,u.name AS client_name,o.commune
     FROM orders o JOIN users u ON u.id=o.user_id WHERE o.status <> 'attente_paiement' ORDER BY o.created_at DESC LIMIT 6`);
   for (const o of recent) await services.orderWithItems(o);
-  res.json({ kpis: k, low, months, objectif, recent });
+  res.json({ kpis: k, low, months, objectif, recent, cotStatus, evolution });
 }));
 
 r.put('/settings', h(async (req, res) => {
@@ -79,17 +87,7 @@ r.put('/users/:id/active', h(async (req, res) => {
 }));
 
 // --- photos ---
-r.post('/upload', h(async (req, res) => {
-  const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(req.body.data || ''));
-  if (!m) throw bad('Image invalide (JPEG, PNG ou WebP).');
-  const buf = Buffer.from(m[2], 'base64');
-  if (buf.length < 100 || buf.length > 700 * 1024) throw bad('Image trop lourde (700 Ko maximum).');
-  const sig = buf.subarray(0, 4).toString('hex');
-  const ok = (m[1] === 'image/jpeg' && sig.startsWith('ffd8ff')) || (m[1] === 'image/png' && sig === '89504e47') || (m[1] === 'image/webp' && buf.subarray(0, 4).toString() === 'RIFF');
-  if (!ok) throw bad('Le fichier n’est pas une image valide.');
-  const img = await db.one('INSERT INTO images(mime,data,created_by) VALUES ($1,$2,$3) RETURNING id', [m[1], buf, req.user.id]);
-  res.json({ url: `/api/images/${img.id}` });
-}));
+r.post('/upload', h(async (req, res) => res.json({ url: await saveImage(req.body.data, req.user.id) })));
 
 // --- équipe (livreurs, admins) ---
 r.get('/staff', h(async (req, res) => {
@@ -290,6 +288,77 @@ r.post('/cinetpay/sync/:tx', h(async (req, res) => {
 
 r.get('/audit', h(async (req, res) => {
   res.json(await db.many(`SELECT a.created_at, a.action, a.detail, u.name FROM audit_log a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.id DESC LIMIT 200`));
+}));
+
+// --- calendrier des livraisons et zones ---
+r.get('/calendar', h(async (req, res) => {
+  const m = /^\d{4}-\d{2}$/.test(req.query.month || '') ? req.query.month : new Date().toISOString().slice(0, 7);
+  const days = await db.many(`SELECT day::text AS day, count(*)::int AS total,
+      count(*) FILTER (WHERE status='livree')::int AS livrees,
+      count(*) FILTER (WHERE status IN ('confirmee','preparee','en_route'))::int AS a_faire,
+      count(*) FILTER (WHERE status='annulee')::int AS annulees
+    FROM orders WHERE status <> 'attente_paiement' AND to_char(day,'YYYY-MM')=$1 GROUP BY day ORDER BY day`, [m]);
+  res.json({ month: m, days });
+}));
+
+r.get('/zones', h(async (req, res) => {
+  res.json(await db.many(`
+    SELECT u.commune, count(*)::int AS clients,
+      avg(u.lat) AS lat, avg(u.lng) AS lng,
+      coalesce((SELECT count(*) FROM orders o WHERE o.commune = u.commune AND o.status='livree' AND o.delivered_at > now() - interval '90 days'),0)::int AS livraisons
+    FROM users u WHERE u.role='client' AND u.commune <> '' GROUP BY u.commune ORDER BY clients DESC`));
+}));
+
+// --- annonces groupées ---
+const AUDIENCES = { tous: "role='client'", inactifs: "role='client' AND last_active < now() - interval '30 days'",
+  cotisation_complete: "role='client' AND id IN (SELECT user_id FROM cotisations WHERE status='complete')",
+  cotisation_active: "role='client' AND id IN (SELECT user_id FROM cotisations WHERE status='active')" };
+r.get('/announcements', h(async (req, res) => {
+  const counts = {};
+  for (const [k, w] of Object.entries(AUDIENCES)) counts[k] = (await db.one(`SELECT count(*)::int AS n FROM users WHERE ${w} AND active`)).n;
+  res.json({ counts, history: await db.many('SELECT id, audience, body, recipients, created_at FROM announcements ORDER BY id DESC LIMIT 50') });
+}));
+r.post('/announcements', h(async (req, res) => {
+  const body = str(req.body.body, 300);
+  const aud = String(req.body.audience || 'tous');
+  const where = AUDIENCES[aud] || (aud.startsWith('commune:') && COMMUNES.includes(aud.slice(8)) ? "role='client' AND commune=$1" : null);
+  if (body.length < 5) throw bad('Écrivez un message (5 caractères minimum).');
+  if (!where) throw bad('Public inconnu.');
+  const rows = await db.many(`SELECT id FROM users WHERE ${where} AND active`, where.includes('$1') ? [aud.slice(8)] : []);
+  if (!rows.length) throw bad('Aucun client dans ce public.');
+  for (const u of rows) await notify(u.id, body);
+  const a = await db.one('INSERT INTO announcements(audience,body,recipients,created_by) VALUES ($1,$2,$3,$4) RETURNING *', [aud, body, rows.length, req.user.id]);
+  await audit(req.user.id, 'annonce envoyée', `${aud} · ${rows.length} client(s)`);
+  res.json(a);
+}));
+
+// --- modification d'un compte équipe ---
+r.put('/staff/:id', h(async (req, res) => {
+  const id = int(req.params.id);
+  const cur = await db.one("SELECT * FROM users WHERE id=$1 AND role IN ('livreur','admin')", [id]);
+  if (!cur) throw notFound('Compte introuvable.');
+  const name = str(req.body.name, 80) || cur.name;
+  const phone = req.body.phone ? normPhone(req.body.phone) : cur.phone;
+  if (!/^\d{10}$/.test(phone)) throw bad('Téléphone invalide (10 chiffres).');
+  if (await db.one('SELECT 1 FROM users WHERE phone=$1 AND id<>$2', [phone, id])) throw bad('Ce numéro est déjà utilisé.');
+  const role = ['admin', 'livreur'].includes(req.body.role) && id !== req.user.id ? req.body.role : cur.role;
+  await db.query('UPDATE users SET name=$2, phone=$3, role=$4 WHERE id=$1', [id, name, phone, role]);
+  await audit(req.user.id, 'compte équipe modifié', `${name} (${role})`);
+  res.json({ ok: true });
+}));
+
+// --- sauvegarde complète des données (JSON) ---
+const BACKUP_TABLES = ['users', 'products', 'cotisations', 'cotisation_payments', 'orders', 'order_items', 'payments', 'messages', 'notifications', 'announcements', 'settings', 'audit_log'];
+r.get('/backup', h(async (req, res) => {
+  const out = { app: 'biosaveur', created_at: new Date().toISOString(), tables: {} };
+  for (const t of BACKUP_TABLES) {
+    const rows = await db.many(`SELECT * FROM ${t}`);
+    if (t === 'settings') { out.tables[t] = rows.filter((s) => !/key|secret|pass|token/i.test(s.key)); continue; }
+    out.tables[t] = t === 'users' ? rows.map(({ password_hash, qr_token, ...u }) => u) : rows;
+  }
+  await audit(req.user.id, 'sauvegarde téléchargée');
+  res.set({ 'Content-Type': 'application/json', 'Content-Disposition': `attachment; filename="biosaveur-sauvegarde-${new Date().toISOString().slice(0, 10)}.json"` });
+  res.send(JSON.stringify(out));
 }));
 
 // --- démonstration ---
