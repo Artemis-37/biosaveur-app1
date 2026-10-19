@@ -183,7 +183,7 @@
     App.modal('<h2 class="sec-t">Enregistrer un versement</h2><form class="stack" style="gap:12px" data-form="admVers">' +
       '<div class="field"><label for="ak">Cotisation</label><select id="ak" name="k">' + cots.map(function (k) { return '<option value="' + k.id + '"' + (String(k.id) === d.id ? ' selected' : '') + '>' + esc(k.client_name) + ' · ' + fcfa(k.paid) + ' / ' + fcfa(k.target) + '</option>'; }).join('') + '</select></div>' +
       '<div class="field"><label for="am">Montant (FCFA)</label><input id="am" name="m" type="number" min="100" step="5" value="5000" required></div>' +
-      '<div class="field"><label for="amo">Moyen</label><select id="amo" name="moyen"><option>Espèces</option><option>Mobile Money</option><option>Virement</option></select></div>' +
+      '<div class="field"><label for="amo">Moyen</label><select id="amo" name="moyen"><option>Espèces</option><option>Orange Money</option><option>MTN Money</option><option>Moov Money</option><option>Wave</option><option>Virement</option></select></div>' +
       '<div class="field"><label for="are">Référence (facultatif)</label><input id="are" name="ref" maxlength="60" placeholder="N° de reçu ou de transaction"></div>' +
       '<button class="btn p" type="submit">Enregistrer</button><button class="linkbtn" type="button" data-act="closeM">Annuler</button></form>');
   };
@@ -301,7 +301,7 @@
   S.cinetpay = function () {
     return App.get('/admin/cinetpay').then(function (c) {
       var modeTxt = { live: 'Connecté à CinetPay', simulation: 'Mode test (simulation)', off: 'Non configuré' }[c.mode];
-      return frame('cinetpay', head('Paiement CinetPay', 'Paiement en ligne Mobile Money et carte bancaire') +
+      return frame('cinetpay', head('Paiement CinetPay', 'Orange Money, MTN Money, Moov Money, Wave et carte bancaire — tous les paiements en ligne passent par CinetPay') +
         '<div class="card pad row" style="flex-wrap:wrap;gap:14px;align-items:flex-start">' +
         '<span style="width:46px;height:46px;border-radius:50%;background:' + (c.enabled ? 'var(--ok-bg)' : 'var(--warn-bg)') + ';color:' + (c.enabled ? 'var(--ok)' : 'var(--warn)') + ';display:flex;align-items:center;justify-content:center;flex-shrink:0">' + ic(c.enabled ? 'check' : 'card') + '</span>' +
         '<div style="flex:1 1 260px"><strong style="font-size:16px">' + modeTxt + ' · paiement en ligne ' + (c.enabled ? 'proposé aux clients' : 'masqué') + '</strong><br><span class="small muted">' +

@@ -123,7 +123,7 @@ r.get('/cotisations', h(async (req, res) => {
 r.post('/cotisations/:id/payments', h(async (req, res) => {
   const amount = int(req.body.amount);
   if (amount <= 0 || amount > 10000000) throw bad('Montant invalide.');
-  const method = ['Espèces', 'Mobile Money', 'Virement'].includes(req.body.method) ? req.body.method : 'Espèces';
+  const method = ['Espèces', 'Mobile Money', 'Orange Money', 'MTN Money', 'Moov Money', 'Wave', 'CinetPay', 'Virement'].includes(req.body.method) ? req.body.method : 'Espèces';
   const paid = await db.tx((c) => services.addCotisationPayment(int(req.params.id), amount, method, str(req.body.reference, 60), req.user.id, c));
   await audit(req.user.id, 'versement enregistré', `cotisation ${req.params.id} · ${fcfa(amount)} · ${method}`);
   res.json({ paid });
