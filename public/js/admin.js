@@ -31,7 +31,7 @@
         '<div class="akpis">' + kpi('Clients inscrits', k.clients) + kpi('Cotisations actives', k.cot_actives) + kpi('FCFA collectés (cotisations)', fcfa(k.collecte), true) +
         kpi('Messages non lus', k.threads_non_lus) + kpi('Cotisations complètes', k.cot_completes) + kpi('Livraisons effectuées', k.livrees) + kpi('Ventes payées ce mois', fcfa(k.ventes_mois), true) + '</div>' +
         '<div class="grid2" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">' +
-        '<section class="card pad stack chart" style="gap:10px"><div class="between"><h2 class="sec-t" style="font-size:16px">Cotisations collectées par mois</h2><button class="linkbtn" data-act="objectif">' + (d.objectif ? 'Objectif : ' + fcfa(d.objectif) : 'Fixer un objectif') + '</button></div>' + chart(d.months, d.objectif) +
+        '<section class="card pad stack chart" style="gap:10px"><div class="between"><h2 class="sec-t" style="font-size:16px">Évolution de la collecte par mois</h2><button class="linkbtn" data-act="objectif">' + (d.objectif ? 'Objectif : ' + fcfa(d.objectif) : 'Fixer un objectif') + '</button></div>' + chart(d.months, d.objectif) +
         '<div class="legend"><span><i style="background:#103d3a"></i>Cotisations</span><span><i style="background:#25b810"></i>Ventes boutique</span>' + (d.objectif ? '<span><i style="background:#c08a00"></i>Objectif mensuel</span>' : '') + '</div></section>' +
         '<section class="card pad stack" style="gap:8px"><h2 class="sec-t" style="font-size:16px">À traiter</h2>' + (alerts || '<p class="muted small">Rien à signaler.</p>') + '</section></div>' +
         '<div class="grid2" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">' +
@@ -67,17 +67,19 @@
     var max = obj || 0; months.forEach(function (x) { max = Math.max(max, x.cotisations, x.ventes); });
     var step = max > 2000000 ? 1000000 : max > 400000 ? 250000 : max > 80000 ? 50000 : 10000;
     var top = Math.max(step, Math.ceil(max / step) * step);
-    var ih = H - b - t, iw = W - l - r, gw = iw / months.length, bw = Math.min(24, gw / 3);
+    var ih = H - b - t, iw = W - l - r;
+    var X = function (i) { return l + (months.length < 2 ? iw / 2 : iw * i / (months.length - 1)); };
     var y = function (v) { return t + ih - (v / top) * ih; };
     var fmt = function (v) { return v >= 1e6 ? (v / 1e6).toString().replace('.', ',') + ' M' : v >= 1000 ? Math.round(v / 1000) + ' k' : String(v); };
-    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Collecte par mois sur six mois">';
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Évolution de la collecte par mois sur six mois">';
     for (var v = 0; v <= top; v += step) s += '<line x1="' + l + '" x2="' + (W - r) + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="#e3e8e5"/><text x="' + (l - 8) + '" y="' + (y(v) + 4) + '" text-anchor="end" font-size="11" fill="#56625e">' + fmt(v) + '</text>';
-    months.forEach(function (x, i) {
-      var cx = l + gw * i + gw / 2, mm = +x.month.slice(5, 7) - 1;
-      s += '<rect x="' + (cx - bw - 2) + '" y="' + y(x.cotisations) + '" width="' + bw + '" height="' + (y(0) - y(x.cotisations)) + '" rx="3" fill="#103d3a"><title>Cotisations : ' + fcfa(x.cotisations) + '</title></rect>';
-      s += '<rect x="' + (cx + 2) + '" y="' + y(x.ventes) + '" width="' + bw + '" height="' + (y(0) - y(x.ventes)) + '" rx="3" fill="#25b810"><title>Ventes : ' + fcfa(x.ventes) + '</title></rect>';
-      s += '<text x="' + cx + '" y="' + (H - 8) + '" text-anchor="middle" font-size="11" fill="#56625e">' + App.MOIS[mm] + '</text>';
+    [['cotisations', '#103d3a', 'Cotisations'], ['ventes', '#25b810', 'Ventes']].forEach(function (k) {
+      var pts = months.map(function (x, i) { return X(i) + ',' + y(x[k[0]]); }).join(' ');
+      if (k[0] === 'cotisations' && months.length > 1) s += '<polygon points="' + X(0) + ',' + y(0) + ' ' + pts + ' ' + X(months.length - 1) + ',' + y(0) + '" fill="#103d3a" opacity=".07"/>';
+      s += '<polyline fill="none" stroke="' + k[1] + '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points="' + pts + '"/>';
+      months.forEach(function (x, i) { s += '<circle cx="' + X(i) + '" cy="' + y(x[k[0]]) + '" r="4" fill="#fff" stroke="' + k[1] + '" stroke-width="2.5"><title>' + k[2] + ' : ' + fcfa(x[k[0]]) + '</title></circle>'; });
     });
+    months.forEach(function (x, i) { s += '<text x="' + X(i) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="11" fill="#56625e">' + App.MOIS[+x.month.slice(5, 7) - 1] + '</text>'; });
     if (obj) s += '<line x1="' + l + '" x2="' + (W - r) + '" y1="' + y(obj) + '" y2="' + y(obj) + '" stroke="#c08a00" stroke-width="2" stroke-dasharray="6 4"/>';
     return s + '</svg>';
   }
