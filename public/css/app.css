@@ -420,3 +420,5 @@ html.native footer.cf{display:none}
 .cal-d.has{border-color:var(--vf);background:#f4faf2}
 .cal-d.today{outline:2px solid var(--j)}
 @media (max-width:600px){.cal-d{min-height:54px;padding:4px}.cal-d .xs{display:none}}
+
+.bellbtn{position:relative}.staffbar .bellbtn .badge{position:absolute;top:2px;right:0;min-width:17px;height:17px;font-size:10px}

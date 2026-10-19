@@ -264,9 +264,30 @@
     });
     setInterval(function () { if (App.cfg.user && document.visibilityState === 'visible') App.refreshBadges(); }, 60000);
   };
+  App.A.staffBell = function () {
+    App.get('/staff/notifications').then(function (list) {
+      App.modal('<h2 class="sec-t" style="margin-bottom:8px">Notifications</h2>' +
+        (list.length ? '<div style="max-height:60vh;overflow:auto">' + list.map(function (n) {
+          return '<div class="list-row" style="padding:8px 0;align-items:flex-start">' + (n.read ? '<span style="width:8px;flex-shrink:0"></span>' : '<span class="dotn" style="margin-top:6px"></span>') +
+            '<span style="flex:1">' + App.esc(n.body) + '<br><span class="xs muted">' + App.ago(n.created_at) + '</span></span></div>';
+        }).join('') + '</div>' : '<p class="muted small">Aucune notification pour le moment.</p>') +
+        '<div class="row" style="gap:8px;margin-top:12px"><button class="btn p sm" data-act="closeM">Fermer</button></div>');
+      if (list.some(function (n) { return !n.read; })) {
+        App.post('/staff/notifications/read').then(function () {
+          document.querySelectorAll('[data-badge=bell]').forEach(function (el) { el.hidden = true; el.textContent = '0'; });
+        }).catch(function () { /* silencieux */ });
+      }
+    }).catch(App.err);
+  };
   App.badges = { notifications: 0, messages: 0 };
   App.refreshBadges = function () {
-    var u = App.cfg.user; if (!u || u.role !== 'client') return;
+    var u = App.cfg.user; if (!u) return;
+    if (u.role !== 'client') {
+      App.get('/staff/notifications/count').then(function (b) {
+        document.querySelectorAll('[data-badge=bell]').forEach(function (el) { el.textContent = b.unread > 99 ? '99+' : b.unread; el.hidden = !b.unread; });
+      }).catch(function () { /* silencieux */ });
+      return;
+    }
     App.get('/client/badges').then(function (b) {
       var changed = b.notifications !== App.badges.notifications || b.messages !== App.badges.messages;
       App.badges = b;

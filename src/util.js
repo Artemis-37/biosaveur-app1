@@ -76,6 +76,11 @@ async function notify(userId, body, client = db) {
   require('./push').sendPush(userId, body); // sans attendre
   require('./mailer').mailUser(userId, body);
 }
+// Notification à tous les comptes actifs d'un rôle (ex. les administrateurs).
+async function notifyRole(role, body, client = db) {
+  const rows = (await client.query('SELECT id FROM users WHERE role=$1 AND active', [role])).rows;
+  for (const u of rows) await notify(u.id, body, client);
+}
 // Alerte de sécurité : journal + notification à tous les administrateurs.
 async function securityAlert(userId, detail) {
   await db.query("INSERT INTO audit_log(user_id, action, detail) VALUES ($1,'ALERTE sécurité',$2)", [userId || null, String(detail).slice(0, 300)]);
@@ -88,5 +93,5 @@ async function audit(userId, action, detail = '', client = db) {
 
 module.exports = {
   HttpError, bad, notFound, forbidden, h, code, normPhone, fmtPhone,
-  isoDate, addDays, nextWeekday, DAYS, fcfa, int, str, num, notify, audit, securityAlert,
+  isoDate, addDays, nextWeekday, DAYS, fcfa, int, str, num, notify, notifyRole, audit, securityAlert,
 };

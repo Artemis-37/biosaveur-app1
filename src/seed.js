@@ -180,6 +180,11 @@ async function seedDemo() {
   await note(ids.client, 'Bienvenue sur la démo BIOSAVEUR ! Toutes les données sont fictives.', -10, true);
   await note(ids.client, 'Versement de cotisation reçu : 4 000 FCFA.', -7);
   await note(ids.client, 'Votre commande est en route.', 0);
+  await note(ids.admin, 'Nouveau message de Client Démo : Bonjour, puis-je changer mon jour de livraison…', -3, true);
+  await note(ids.admin, 'Nouvelle commande de Client Démo : 14 000 FCFA (aujourd’hui, 10h – 12h).', 0);
+  await note(ids.admin, 'Stock bas : pensez à réapprovisionner les produits sous le seuil d’alerte.', 0);
+  await note(ids.livreur, 'Nouvelle livraison à effectuer : 2 commandes vous sont attribuées aujourd’hui.', 0);
+  await note(ids.livreur, 'Rappel : scannez le QR code du client à chaque remise.', -1, true);
 
   for (const [aud, body, n, off] of [
     ['tous', 'Nouveau : le poulet braisé est disponible chaque samedi. Commandez avant vendredi 18h !', 11, -21],

@@ -3,7 +3,7 @@
 const config = require('./config');
 const db = require('./db');
 const cinetpay = require('./cinetpay');
-const { bad, notFound, code, isoDate, addDays, nextWeekday, fcfa, notify, audit, securityAlert } = require('./util');
+const { bad, notFound, code, isoDate, addDays, nextWeekday, fcfa, notify, notifyRole, audit, securityAlert } = require('./util');
 
 const STATUS_LABEL = {
   attente_paiement: 'en attente de paiement', confirmee: 'confirmée', preparee: 'préparée',
@@ -109,6 +109,7 @@ async function createOrder(user, { items, day, slot, pay_method, expected_total 
         [o.id, l.p.id, l.p.name, l.option, l.qty, l.p.price]);
     }
     if (status === 'confirmee') await notify(user.id, `Commande ${o.number} confirmée pour le ${o.day}, ${o.slot}.`, c);
+    await notifyRole('admin', `Nouvelle commande ${o.number} de ${user.name} : ${fcfa(o.total)} (${o.day}, ${o.slot}).`, c);
     return o;
   });
 
@@ -184,6 +185,7 @@ async function applyPayment(transactionId, status, method = '', message = '') {
         if (status === 'ACCEPTED') {
           await c.query("UPDATE orders SET status='confirmee', paid=true WHERE id=$1", [o.id]);
           await notify(o.user_id, `Paiement reçu. Commande ${o.number} confirmée pour le ${o.day}, ${o.slot}.`, c);
+          await notifyRole('admin', `Paiement en ligne reçu pour la commande ${o.number} (${fcfa(o.total)}).`, c);
         } else {
           await cancelOrder(o.id, 'paiement refusé', c);
         }

@@ -75,6 +75,7 @@ app.use('/api', (req, res, next) => {
 app.use('/api', require('./routes/public').router);
 app.use('/api/client', require('./routes/client'));
 app.use('/api/driver', require('./routes/driver'));
+app.use('/api/staff/notifications', require('./routes/notifs'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/cinetpay', require('./routes/cinetpay'));
 

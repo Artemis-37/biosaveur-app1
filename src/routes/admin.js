@@ -164,6 +164,7 @@ r.put('/orders/:id/status', h(async (req, res) => {
       paid = CASE WHEN $2='livree' THEN true ELSE paid END WHERE id=$1`, [o.id, s, driver]);
     if (s === 'livree') await db.tx((c) => services.rewardReferral(o.id, c));
     await notify(o.user_id, `Commande ${o.number} : ${services.STATUS_LABEL[s]}.`);
+    if (driver && driver !== o.driver_id) await notify(driver, `Nouvelle livraison à effectuer : ${o.number} (${o.day}, ${o.slot}).`);
   }
   await audit(req.user.id, 'statut commande', `${o.number} → ${s}`);
   res.json({ ok: true });
@@ -172,7 +173,10 @@ r.put('/orders/:id/status', h(async (req, res) => {
 r.put('/orders/:id/driver', h(async (req, res) => {
   const d = req.body.driver_id ? int(req.body.driver_id) : null;
   if (d && !(await db.one("SELECT 1 FROM users WHERE id=$1 AND role='livreur'", [d]))) throw bad('Livreur inconnu.');
+  const prev = await db.one('SELECT number, day, slot, driver_id FROM orders WHERE id=$1', [int(req.params.id)]);
+  if (!prev) throw notFound('Commande introuvable.');
   await db.query('UPDATE orders SET driver_id=$2 WHERE id=$1', [int(req.params.id), d]);
+  if (d && d !== prev.driver_id) await notify(d, `Nouvelle livraison à effectuer : ${prev.number} (${prev.day}, ${prev.slot}).`);
   res.json({ ok: true });
 }));
 

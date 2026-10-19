@@ -201,6 +201,7 @@ r.get('/messages', h(async (req, res) => {
 r.post('/messages', h(async (req, res) => {
   const body = str(req.body.body, 1000);
   if (!body) throw bad('Message vide.');
+  await require('../util').notifyRole('admin', `Nouveau message de ${req.user.name} : ${body.slice(0, 80)}`);
   res.json(await db.one('INSERT INTO messages(user_id,from_team,author_id,body) VALUES ($1,false,$1,$2) RETURNING id, from_team, body, created_at', [req.user.id, body]));
 }));
 

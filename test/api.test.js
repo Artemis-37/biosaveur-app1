@@ -351,3 +351,32 @@ test('CORS : l’appli mobile peut envoyer l’en-tête X-Enc', async () => {
   assert.equal(r.status, 204);
   assert.match(r.headers.get('access-control-allow-headers'), /X-Enc/);
 });
+
+test('notifications équipe : admin (nouvelle commande) et livreur (affectation)', async () => {
+  const cl = agent(), ad = agent(), lv = agent();
+  await cl('POST', '/auth/login', { phone: '0700000001', password: 'demo1234' });
+  await ad('POST', '/auth/login', { phone: '0700000000', password: 'demo1234' });
+  await lv('POST', '/auth/login', { phone: '0700000012', password: 'demo1234' });
+  assert.equal((await cl('GET', '/staff/notifications')).status, 403, 'réservé à l’équipe');
+  const p = (await cl('GET', '/products')).body.find((x) => x.stock > 5 && x.category !== 'evenements');
+  const opt = p.options && p.options.length ? { option: p.options[0] } : {};
+  const day = new Date().toISOString().slice(0, 10);
+  const o = await cl('POST', '/client/orders', { items: [{ product_id: p.id, qty: 1, ...opt }], day, slot: '10h – 12h', pay_method: 'livraison' });
+  assert.equal(o.status, 200, JSON.stringify(o.body));
+  const before = (await ad('GET', '/staff/notifications/count')).body.unread;
+  assert.ok(before >= 1);
+  const list = (await ad('GET', '/staff/notifications')).body;
+  assert.ok(list.some((n) => n.body.includes(o.body.order.number) && n.body.includes('Nouvelle commande')));
+  await ad('POST', '/staff/notifications/read', {});
+  assert.equal((await ad('GET', '/staff/notifications/count')).body.unread, 0);
+  const drv = (await ad('GET', '/admin/staff')).body;
+  const driver = (Array.isArray(drv) ? drv : []).find((u) => u.phone === '0700000012') || (Array.isArray(drv) ? drv : []).find((u) => u.role === 'livreur');
+  assert.ok(driver, 'un livreur existe');
+  {
+    await ad('PUT', `/admin/orders/${o.body.order.id}/driver`, { driver_id: driver.id });
+    const l2 = agent();
+    await l2('POST', '/auth/login', { phone: driver.phone, password: 'demo1234' });
+    const n = (await l2('GET', '/staff/notifications')).body;
+    assert.ok(n.some((x) => x.body.includes('Nouvelle livraison')), 'livreur notifié');
+  }
+});

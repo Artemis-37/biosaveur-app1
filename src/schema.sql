@@ -166,6 +166,7 @@ DROP TABLE IF EXISTS supply_orders;
 DROP SEQUENCE IF EXISTS supply_number_seq;
 ALTER TABLE products DROP COLUMN IF EXISTS supplier_id;
 DELETE FROM users WHERE role='fournisseur';
+DELETE FROM notifications WHERE body LIKE 'Approvisionnement %' OR body LIKE '%confirme l’approvisionnement%';
 -- Le rôle « partenaire » a été retiré : nettoyage des anciens comptes et de leurs versements.
 DELETE FROM users WHERE role='partenaire';
 DROP TABLE IF EXISTS partner_payouts;
