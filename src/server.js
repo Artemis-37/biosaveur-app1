@@ -28,7 +28,7 @@ app.use('/api', (req, res, next) => {
   if (origin && config.appOrigins.includes(origin)) {
     res.set({
       'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, X-Client',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, X-Client, X-Enc',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Max-Age': '86400',
       Vary: 'Origin',

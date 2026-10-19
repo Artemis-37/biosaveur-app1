@@ -345,3 +345,9 @@ test('enveloppe chiffrée : prix illisibles pour un proxy, requête altérée re
   r = await fetch(base + '/auth/login', { method: 'POST', headers: H, body: JSON.stringify({ e: flipped }) });
   assert.equal(r.status, 400, 'octet modifié = rejeté (GCM)');
 });
+
+test('CORS : l’appli mobile peut envoyer l’en-tête X-Enc', async () => {
+  const r = await fetch(base + '/products', { method: 'OPTIONS', headers: { Origin: 'https://localhost', 'Access-Control-Request-Method': 'GET', 'Access-Control-Request-Headers': 'x-enc,x-requested-with' } });
+  assert.equal(r.status, 204);
+  assert.match(r.headers.get('access-control-allow-headers'), /X-Enc/);
+});
