@@ -180,7 +180,7 @@
 
   /* ---------- routage ---------- */
   App.ROLE_LABEL = { client: 'Client', livreur: 'Livreur', admin: 'Administrateur' };
-  App.homeOf = function (role) { return { livreur: '#/livreur', admin: '#/admin' }[role] || '#/'; };
+  App.homeOf = function (role) { return { livreur: '#/livreur', admin: '#/admin', directeur: '#/admin', informaticien: '#/admin' }[role] || '#/'; };
   App.routes = {};
   App.route = function (name, fn) { App.routes[name] = fn; };
   App.go = function (hash) { if (location.hash === hash) App.render(); else location.hash = hash; };

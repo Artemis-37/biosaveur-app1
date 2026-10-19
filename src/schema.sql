@@ -174,7 +174,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS demo BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS company TEXT NOT NULL DEFAULT '';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS commission_rate NUMERIC(5,4) NOT NULL DEFAULT 0.05;
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
-ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('client','livreur','admin'));
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('client','livreur','admin','directeur','informaticien'));
 
 -- v3 : photos téléversées depuis le back-office
 CREATE TABLE IF NOT EXISTS images (

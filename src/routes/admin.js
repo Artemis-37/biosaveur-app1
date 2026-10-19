@@ -5,16 +5,22 @@ const config = require('../config');
 const db = require('../db');
 const cinetpay = require('../cinetpay');
 const services = require('../services');
-const { need, hash } = require('../auth');
+const { need, hash, BACKOFFICE, INFO_PATHS } = require('../auth');
 const { COMMUNES } = require('./public');
 const { ensureUser } = require('../seed');
 const { saveImage } = require('../images');
-const { h, bad, notFound, int, str, normPhone, notify, audit, fcfa } = require('../util');
+const { h, bad, forbidden, notFound, int, str, normPhone, notify, audit, fcfa } = require('../util');
 
+const STAFF_ROLES = ['livreur', 'admin', 'directeur', 'informaticien'];
 const CATS = ['entier', 'decoupes', 'packs', 'fume', 'abats', 'evenements'];
 
 const r = express.Router();
-r.use(need('admin'));
+r.use(need(...BACKOFFICE));
+// L'informaticien n'accède qu'aux écrans techniques : ni clients, ni versements, ni sauvegarde.
+r.use((req, _res, next) => {
+  if (req.user.role !== 'informaticien' || INFO_PATHS.some((p) => req.path === p || req.path.startsWith(p + '/'))) return next();
+  next(forbidden('Accès non autorisé pour votre rôle.'));
+});
 
 r.get('/overview', h(async (req, res) => {
   const k = await db.one(`SELECT
@@ -91,11 +97,11 @@ r.post('/upload', h(async (req, res) => res.json({ url: await saveImage(req.body
 
 // --- équipe (livreurs, admins) ---
 r.get('/staff', h(async (req, res) => {
-  res.json(await db.many("SELECT id,role,name,company,phone,active,created_at,last_active,commission_rate FROM users WHERE role IN ('livreur','admin') ORDER BY role, name"));
+  res.json(await db.many("SELECT id,role,name,company,phone,active,created_at,last_active,commission_rate FROM users WHERE role IN ('livreur','admin','directeur','informaticien') ORDER BY role, name"));
 }));
 
 r.post('/staff', h(async (req, res) => {
-  const role = ['admin', 'livreur'].includes(req.body.role) ? req.body.role : 'livreur';
+  const role = STAFF_ROLES.includes(req.body.role) ? req.body.role : 'livreur';
   const name = str(req.body.name, 80);
   const phone = normPhone(req.body.phone);
   const password = String(req.body.password || '');
@@ -110,7 +116,7 @@ r.post('/staff', h(async (req, res) => {
 r.put('/staff/:id/password', h(async (req, res) => {
   const pw = String(req.body.password || '');
   if (pw.length < 6) throw bad('Mot de passe trop court.');
-  await db.query("UPDATE users SET password_hash=$2 WHERE id=$1 AND role IN ('livreur','admin')", [int(req.params.id), await hash(pw)]);
+  await db.query("UPDATE users SET password_hash=$2 WHERE id=$1 AND role IN ('livreur','admin','directeur','informaticien')", [int(req.params.id), await hash(pw)]);
   res.json({ ok: true });
 }));
 
@@ -347,13 +353,13 @@ r.post('/announcements', h(async (req, res) => {
 // --- modification d'un compte équipe ---
 r.put('/staff/:id', h(async (req, res) => {
   const id = int(req.params.id);
-  const cur = await db.one("SELECT * FROM users WHERE id=$1 AND role IN ('livreur','admin')", [id]);
+  const cur = await db.one("SELECT * FROM users WHERE id=$1 AND role IN ('livreur','admin','directeur','informaticien')", [id]);
   if (!cur) throw notFound('Compte introuvable.');
   const name = str(req.body.name, 80) || cur.name;
   const phone = req.body.phone ? normPhone(req.body.phone) : cur.phone;
   if (!/^\d{10}$/.test(phone)) throw bad('Téléphone invalide (10 chiffres).');
   if (await db.one('SELECT 1 FROM users WHERE phone=$1 AND id<>$2', [phone, id])) throw bad('Ce numéro est déjà utilisé.');
-  const role = ['admin', 'livreur'].includes(req.body.role) && id !== req.user.id ? req.body.role : cur.role;
+  const role = STAFF_ROLES.includes(req.body.role) && id !== req.user.id ? req.body.role : cur.role;
   await db.query('UPDATE users SET name=$2, phone=$3, role=$4 WHERE id=$1', [id, name, phone, role]);
   await audit(req.user.id, 'compte équipe modifié', `${name} (${role})`);
   res.json({ ok: true });

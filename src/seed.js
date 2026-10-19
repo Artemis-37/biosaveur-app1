@@ -55,13 +55,15 @@ const DEMO_ACCOUNTS = [
   { role: 'admin', name: 'Admin Démo', phone: '0700000000' },
   { role: 'client', name: 'Client Démo', phone: '0700000001', commune: 'Marcory', address: 'Zone 4, rue du Canal', landmark: 'Immeuble beige, 2e porte', lat: 5.2971, lng: -3.9862 },
   { role: 'livreur', name: 'Ibrahim Ouattara (livreur démo)', phone: '0700000002' },
+  { role: 'directeur', name: 'Directrice Démo', phone: '0700000015' },
+  { role: 'informaticien', name: 'Informaticien Démo', phone: '0700000016' },
 ];
 
 // générateur pseudo-aléatoire reproductible
 function rng(seed) { let x = seed; return () => { x = (x * 1103515245 + 12345) % 2147483648; return x / 2147483648; }; }
 
 async function seedDemo() {
-  if (await db.one('SELECT 1 FROM users WHERE demo LIMIT 1')) return;
+  if (await db.one("SELECT 1 FROM users WHERE demo AND role='client' LIMIT 1")) return;
   const R = rng(20261012);
   const pick = (a) => a[Math.floor(R() * a.length)];
   const today = new Date();
@@ -253,7 +255,11 @@ async function seed() {
   if (config.admin.phone && config.admin.password) {
     await ensureUser({ role: 'admin', name: config.admin.name, phone: config.admin.phone, password: config.admin.password });
   }
-  if (config.seedDemo) { await seedDemo(); await seedDemoPhotos(); await rebaseDemo(); }
+  if (config.seedDemo) {
+    // comptes démo ajoutés après coup (directeur, informaticien) sur une base déjà remplie
+    for (const a of DEMO_ACCOUNTS.filter((x) => ['directeur', 'informaticien'].includes(x.role))) await ensureUser({ ...a, password: DEMO_PASSWORD, demo: true, createdAt: addDays(-200) });
+    await seedDemo(); await seedDemoPhotos(); await rebaseDemo();
+  }
 }
 
 module.exports = { seed, rebaseDemo, ensureUser, DEMO_ACCOUNTS, DEMO_PASSWORD };

@@ -54,4 +54,9 @@ function need(...roles) {
   };
 }
 
-module.exports = { hash, check, setSession, clearSession, loadUser, need };
+// Rôles du back-office : admin et directeur = accès complet ; informaticien = technique (produits, CinetPay, journal).
+const BACKOFFICE = ['admin', 'directeur', 'informaticien'];
+const FULL = ['admin', 'directeur'];
+const INFO_PATHS = ['/products', '/upload', '/cinetpay', '/audit', '/settings', '/demo'];
+
+module.exports = { BACKOFFICE, FULL, INFO_PATHS, hash, check, setSession, clearSession, loadUser, need };

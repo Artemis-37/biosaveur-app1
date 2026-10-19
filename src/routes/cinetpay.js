@@ -53,7 +53,7 @@ r.post('/simulate/:tx', need(), h(async (req, res) => {
   if (cinetpay.mode() !== 'simulation') throw bad('Simulation désactivée.');
   const p = await db.one('SELECT * FROM payments WHERE transaction_id=$1', [str(req.params.tx, 60)]);
   if (!p) throw notFound('Transaction inconnue.');
-  if (p.user_id !== req.user.id && req.user.role !== 'admin') throw notFound('Transaction inconnue.');
+  if (p.user_id !== req.user.id && !['admin', 'directeur', 'informaticien'].includes(req.user.role)) throw notFound('Transaction inconnue.');
   const result = req.body.result === 'ACCEPTED' ? 'ACCEPTED' : 'REFUSED';
   const out = await services.applyPayment(p.transaction_id, result, str(req.body.method, 40) || 'SIMULATION', 'simulation');
   res.json({ status: out.status, purpose: out.purpose, ref_id: out.ref_id });
@@ -61,7 +61,7 @@ r.post('/simulate/:tx', need(), h(async (req, res) => {
 
 r.get('/tx/:tx', need(), h(async (req, res) => {
   const p = await db.one('SELECT transaction_id, user_id, purpose, ref_id, amount, status, applied FROM payments WHERE transaction_id=$1', [str(req.params.tx, 60)]);
-  if (!p || (p.user_id !== req.user.id && req.user.role !== 'admin')) throw notFound('Transaction inconnue.');
+  if (!p || (p.user_id !== req.user.id && !['admin', 'directeur', 'informaticien'].includes(req.user.role))) throw notFound('Transaction inconnue.');
   delete p.user_id;
   res.json(p);
 }));

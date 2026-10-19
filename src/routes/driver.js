@@ -7,7 +7,7 @@ const { need } = require('../auth');
 const { h, bad, notFound, isoDate, int, str, notify, audit } = require('../util');
 
 const r = express.Router();
-r.use(need('livreur', 'admin'));
+r.use(need('livreur', 'admin', 'directeur'));
 
 r.get('/tour', h(async (req, res) => {
   const day = /^\d{4}-\d{2}-\d{2}$/.test(req.query.day || '') ? req.query.day : isoDate();
@@ -18,7 +18,7 @@ r.get('/tour', h(async (req, res) => {
       WHERE o.day=$1 AND o.status IN ('confirmee','preparee','en_route','livree')
         AND (o.driver_id IS NULL OR o.driver_id=$2 OR $3)
       ORDER BY o.slot, o.id`,
-    [day, req.user.id, req.user.role === 'admin']
+    [day, req.user.id, ['admin', 'directeur'].includes(req.user.role)]
   );
   for (const o of rows) await services.orderWithItems(o);
   res.json({ day, orders: rows });

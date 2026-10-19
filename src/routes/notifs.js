@@ -6,7 +6,7 @@ const { need } = require('../auth');
 const { h } = require('../util');
 
 const r = express.Router();
-r.use(need('admin', 'livreur'));
+r.use(need('admin', 'directeur', 'informaticien', 'livreur'));
 
 r.get('/', h(async (req, res) => {
   res.json(await db.many('SELECT id, body, read, created_at FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50', [req.user.id]));

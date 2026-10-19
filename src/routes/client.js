@@ -12,7 +12,7 @@ const { h, bad, notFound, str, num, int, DAYS, fcfa } = require('../util');
 const { publicUser, COMMUNES } = require('./public');
 
 const r = express.Router();
-r.use(need('client', 'admin'));
+r.use(need('client', 'admin', 'directeur', 'informaticien'));
 
 r.get('/me', h(async (req, res) => res.json(publicUser(req.user))));
 

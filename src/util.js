@@ -84,7 +84,7 @@ async function notifyRole(role, body, client = db) {
 // Alerte de sécurité : journal + notification à tous les administrateurs.
 async function securityAlert(userId, detail) {
   await db.query("INSERT INTO audit_log(user_id, action, detail) VALUES ($1,'ALERTE sécurité',$2)", [userId || null, String(detail).slice(0, 300)]);
-  const admins = await db.many("SELECT id FROM users WHERE role='admin' AND active");
+  const admins = await db.many("SELECT id FROM users WHERE role IN ('admin','directeur','informaticien') AND active");
   for (const a of admins) await notify(a.id, `⚠ Alerte sécurité : ${String(detail).slice(0, 160)}`);
 }
 async function audit(userId, action, detail = '', client = db) {

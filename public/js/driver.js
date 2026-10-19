@@ -6,7 +6,7 @@
   App.shells.staff = function () {
     var u = App.cfg.user;
     document.getElementById('hdr').innerHTML = '<div class="staffbar"><div class="wrap"><span class="logo">biosaveur</span><span class="small">' + (u ? esc(u.company || u.name) + ' · ' + esc(App.ROLE_LABEL[u.role] || u.role) : '') + '</span><span class="sp"></span>' +
-      (u && u.role === 'admin' ? '<a href="#/admin">' + ic('grid', 's') + 'Admin</a><a href="#/livreur">' + ic('truck', 's') + 'Tournée</a>' : '') +
+      (u && (u.role === 'admin' || u.role === 'directeur') ? '<a href="#/admin">' + ic('grid', 's') + 'Admin</a><a href="#/livreur">' + ic('truck', 's') + 'Tournée</a>' : '') +
       '<a href="#/">' + ic('store', 's') + 'Boutique</a><button data-act="logout">' + ic('logout', 's') + 'Déconnexion</button></div></div>';
     document.getElementById('main').className = '';
     document.getElementById('ftr').innerHTML = '';
@@ -17,7 +17,7 @@
   function needStaff(role) {
     App.needLogin();
     var u = App.cfg.user;
-    if (u.role !== role && u.role !== 'admin') { var e = new Error('Cet espace est réservé à l’équipe BIOSAVEUR.'); e.status = 403; throw e; }
+    if (u.role !== role && u.role !== 'admin' && u.role !== 'directeur' && !(role === 'admin' && u.role === 'informaticien')) { var e = new Error('Cet espace est réservé à l’équipe BIOSAVEUR.'); e.status = 403; throw e; }
   }
   App.needStaff = needStaff;
 

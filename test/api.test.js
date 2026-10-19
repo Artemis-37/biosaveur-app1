@@ -380,3 +380,19 @@ test('notifications équipe : admin (nouvelle commande) et livreur (affectation)
     assert.ok(n.some((x) => x.body.includes('Nouvelle livraison')), 'livreur notifié');
   }
 });
+
+test('rôles directeur et informaticien : accès adaptés', async () => {
+  const dir = agent(), inf = agent();
+  assert.equal((await dir('POST', '/auth/login', { phone: '0700000015', password: 'demo1234' })).status, 200);
+  assert.equal((await inf('POST', '/auth/login', { phone: '0700000016', password: 'demo1234' })).status, 200);
+  assert.equal((await dir('GET', '/admin/overview')).status, 200, 'directeur : accès complet');
+  assert.equal((await dir('GET', '/admin/clients')).status, 200);
+  assert.equal((await inf('GET', '/admin/products')).status, 200, 'informaticien : produits');
+  assert.equal((await inf('GET', '/admin/audit')).status, 200, 'informaticien : journal');
+  assert.equal((await inf('GET', '/admin/cinetpay')).status, 200, 'informaticien : CinetPay');
+  for (const p of ['/admin/clients', '/admin/overview', '/admin/cotisations', '/admin/backup', '/admin/staff']) {
+    assert.equal((await inf('GET', p)).status, 403, `informaticien refusé : ${p}`);
+  }
+  const anon = agent();
+  assert.equal((await anon('GET', '/admin/overview')).status, 401);
+});

@@ -5,13 +5,15 @@
 
   var MENU = [['apercu', 'home', 'Vue d’ensemble'], ['commandes', 'truck', 'Commandes & livraisons'], ['clients', 'users', 'Clients'], ['cotisations', 'coin', 'Cotisations & versements'],
     ['stock', 'box', 'Produits & stock'], ['calendrier', 'truck', 'Calendrier & zones'], ['messages', 'chat', 'Messagerie'], ['annonces', 'chat', 'SMS & annonces'], ['equipe', 'user', 'Équipe'], ['cinetpay', 'card', 'Paiement CinetPay'], ['journal', 'list', 'Journal'], ['demo', 'list', 'Version démo']];
-  var ROLES = { admin: 'Administrateur', livreur: 'Livreur' };
+  var ROLES = { admin: 'Administrateur', directeur: 'Directeur(trice)', informaticien: 'Informaticien', livreur: 'Livreur' };
+  var INFO_SECTIONS = ['stock', 'cinetpay', 'journal', 'demo'];
+  function roleOpts(cur) { return ['livreur', 'admin', 'directeur', 'informaticien'].map(function (k) { return '<option value="' + k + '"' + (k === cur ? ' selected' : '') + '>' + ROLES[k] + '</option>'; }).join(''); }
   var AV = { filter: 'tous', day: App.iso(new Date()), status: '', thread: null, q: '' };
 
   function frame(cur, body, badges) {
     badges = badges || {};
     return '<div class="adm"><aside aria-label="Menu administrateur">' +
-      MENU.map(function (m) { return '<button class="mi" data-act="nav" data-h="#/admin/' + m[0] + '"' + (cur === m[0] ? ' aria-current="page"' : '') + '>' + ic(m[1], 's') + '<span>' + m[2] + '</span>' + (badges[m[0]] ? '<span class="badge">' + badges[m[0]] + '</span>' : '') + '</button>'; }).join('') +
+      MENU.filter(function (m) { return App.cfg.user.role !== 'informaticien' || INFO_SECTIONS.indexOf(m[0]) >= 0; }).map(function (m) { return '<button class="mi" data-act="nav" data-h="#/admin/' + m[0] + '"' + (cur === m[0] ? ' aria-current="page"' : '') + '>' + ic(m[1], 's') + '<span>' + m[2] + '</span>' + (badges[m[0]] ? '<span class="badge">' + badges[m[0]] + '</span>' : '') + '</button>'; }).join('') +
       '</aside><section>' + body + '</section></div>';
   }
   function head(t, sub, extra) { return '<div class="row" style="flex-wrap:wrap;gap:12px"><div style="flex:1 1 240px"><h1 style="font-size:24px;font-weight:800;color:var(--vf)">' + t + '</h1><span class="small muted">' + sub + '</span></div>' + (extra || '') + '</div>'; }
@@ -320,7 +322,7 @@
         '<section class="card pad stack" style="gap:12px"><h2 class="sec-t" style="font-size:16px">Ajouter un membre</h2><form class="form-grid" data-form="staffAdd">' +
         '<div class="field"><label for="sn">Nom</label><input id="sn" name="name" required></div>' +
         '<div class="field"><label for="sp">Téléphone</label><input id="sp" name="phone" inputmode="tel" required></div>' +
-        '<div class="field"><label for="sr">Rôle</label><select id="sr" name="role"><option value="livreur">Livreur</option><option value="admin">Administrateur</option></select></div>' +
+        '<div class="field"><label for="sr">Rôle</label><select id="sr" name="role">' + roleOpts('livreur') + '</select></div>' +
         '<div class="field"><label for="sw">Mot de passe provisoire</label><input id="sw" name="password" type="text" minlength="6" required></div>' +
         '<button class="btn p" type="submit" style="align-self:end">Créer le compte</button></form></section>');
     });
@@ -448,7 +450,7 @@
     App.modal('<h2 class="sec-t">Modifier le compte</h2><form class="stack" style="gap:12px" data-form="staffEdit" data-id="' + u.id + '">' +
       '<div class="field"><label for="se-n">Nom</label><input id="se-n" name="name" value="' + esc(u.name) + '" required></div>' +
       '<div class="field"><label for="se-p">Téléphone</label><input id="se-p" name="phone" value="' + esc(u.phone) + '" inputmode="tel" required></div>' +
-      (u.id !== App.cfg.user.id ? '<div class="field"><label for="se-r">Rôle</label><select id="se-r" name="role"><option value="livreur"' + (u.role === 'livreur' ? ' selected' : '') + '>Livreur</option><option value="admin"' + (u.role === 'admin' ? ' selected' : '') + '>Administrateur</option></select></div>' : '') +
+      (u.id !== App.cfg.user.id ? '<div class="field"><label for="se-r">Rôle</label><select id="se-r" name="role">' + roleOpts(u.role) + '</select></div>' : '') +
       '<button class="btn p" type="submit">Enregistrer</button><button class="linkbtn" type="button" data-act="closeM">Annuler</button></form>');
   };
   App.F.staffEdit = function (fd, form) {
@@ -473,8 +475,11 @@
 
   App.route('admin', function (r) {
     App.needStaff('admin');
-    if (App.cfg.user.role !== 'admin') { var e = new Error('Espace réservé aux administrateurs.'); e.status = 403; throw e; }
-    var s = S[r.args[0]] || S.apercu;
+    var ur = App.cfg.user.role;
+    if (['admin', 'directeur', 'informaticien'].indexOf(ur) < 0) { var e = new Error('Espace réservé à l’équipe de direction.'); e.status = 403; throw e; }
+    var sec = r.args[0] || (ur === 'informaticien' ? 'stock' : 'apercu');
+    if (ur === 'informaticien' && INFO_SECTIONS.indexOf(sec) < 0) sec = 'stock';
+    var s = S[sec] || S.apercu;
     return s(r);
   });
   App.routes.admin.shell = 'staff';
