@@ -61,7 +61,6 @@ app.use('/api/driver', require('./routes/driver'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/cinetpay', require('./routes/cinetpay'));
 app.use('/api/supplier', require('./routes/supplier').router);
-app.use('/api/partner', require('./routes/partner').router);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Route inconnue.' }));
 

@@ -4,8 +4,8 @@
   var App = window.App, ic = App.ic, esc = App.esc, fcfa = App.fcfa, M = App.map;
 
   var MENU = [['apercu', 'home', 'Vue d’ensemble'], ['commandes', 'truck', 'Commandes & livraisons'], ['clients', 'users', 'Clients'], ['cotisations', 'coin', 'Cotisations & versements'],
-    ['stock', 'box', 'Produits & stock'], ['appro', 'truck', 'Approvisionnement'], ['partenaires', 'users', 'Partenaires'], ['messages', 'chat', 'Messagerie'], ['equipe', 'user', 'Équipe'], ['cinetpay', 'card', 'Paiement CinetPay'], ['journal', 'list', 'Journal'], ['demo', 'list', 'Version démo']];
-  var ROLES = { admin: 'Administrateur', livreur: 'Livreur', fournisseur: 'Fournisseur', partenaire: 'Partenaire' };
+    ['stock', 'box', 'Produits & stock'], ['appro', 'truck', 'Approvisionnement'], ['messages', 'chat', 'Messagerie'], ['equipe', 'user', 'Équipe'], ['cinetpay', 'card', 'Paiement CinetPay'], ['journal', 'list', 'Journal'], ['demo', 'list', 'Version démo']];
+  var ROLES = { admin: 'Administrateur', livreur: 'Livreur', fournisseur: 'Fournisseur' };
   var AV = { filter: 'tous', day: App.iso(new Date()), status: '', thread: null, q: '' };
 
   function frame(cur, body, badges) {
@@ -256,15 +256,15 @@
 
   S.equipe = function () {
     return App.get('/admin/staff').then(function (list) {
-      return frame('equipe', head('Équipe', 'Livreurs, fournisseurs, partenaires et administrateurs') +
+      return frame('equipe', head('Équipe', 'Livreurs, fournisseurs et administrateurs') +
         '<section class="card pad tbl"><table><thead><tr><th>Nom</th><th>Rôle</th><th>Téléphone</th><th>Dernière activité</th><th>État</th><th></th></tr></thead><tbody>' +
         list.map(function (u) { return '<tr><td><strong>' + esc(u.name) + '</strong></td><td>' + esc(ROLES[u.role] || u.role) + (u.company ? '<br><span class="xs muted">' + esc(u.company) + '</span>' : '') + '</td><td class="num">' + App.phone(u.phone) + '</td><td>' + App.ago(u.last_active) + '</td><td>' + (u.active ? '<span class="pill ok">Actif</span>' : '<span class="pill neutral">Désactivé</span>') + '</td><td><div class="row" style="gap:6px"><button class="btn o sm" data-act="staffPw" data-id="' + u.id + '">Mot de passe</button>' + (u.id !== App.cfg.user.id ? '<button class="btn o sm" data-act="staffActive" data-id="' + u.id + '" data-v="' + (u.active ? '0' : '1') + '">' + (u.active ? 'Désactiver' : 'Réactiver') + '</button>' : '') + '</div></td></tr>'; }).join('') +
         '</tbody></table></section>' +
         '<section class="card pad stack" style="gap:12px"><h2 class="sec-t" style="font-size:16px">Ajouter un membre</h2><form class="form-grid" data-form="staffAdd">' +
         '<div class="field"><label for="sn">Nom</label><input id="sn" name="name" required></div>' +
         '<div class="field"><label for="sp">Téléphone</label><input id="sp" name="phone" inputmode="tel" required></div>' +
-        '<div class="field"><label for="sr">Rôle</label><select id="sr" name="role"><option value="livreur">Livreur</option><option value="fournisseur">Fournisseur</option><option value="partenaire">Partenaire</option><option value="admin">Administrateur</option></select></div>' +
-        '<div class="field"><label for="sc">Entreprise (fournisseur / partenaire)</label><input id="sc" name="company" maxlength="120"></div>' +
+        '<div class="field"><label for="sr">Rôle</label><select id="sr" name="role"><option value="livreur">Livreur</option><option value="fournisseur">Fournisseur</option><option value="admin">Administrateur</option></select></div>' +
+        '<div class="field"><label for="sc">Entreprise (fournisseur)</label><input id="sc" name="company" maxlength="120"></div>' +
         '<div class="field"><label for="sw">Mot de passe provisoire</label><input id="sw" name="password" type="text" minlength="6" required></div>' +
         '<button class="btn p" type="submit" style="align-self:end">Créer le compte</button></form></section>');
     });
@@ -333,25 +333,6 @@
     return App.post('/admin/supply', b).then(function () { App.modal(null); App.toast('Commande envoyée au fournisseur.'); App.render(); });
   };
   App.A.supplyCancel = function (d) { App.put('/admin/supply/' + d.id + '/cancel', {}).then(function () { App.toast('Commande annulée.'); App.render(); }).catch(App.err); };
-
-  S.partenaires = function () {
-    return App.get('/admin/partners').then(function (list) {
-      return frame('partenaires', head('Partenaires', 'Clients apportés et commissions à verser') +
-        '<section class="card pad tbl"><table><thead><tr><th>Partenaire</th><th>Taux</th><th>Clients</th><th>Ventes livrées</th><th>Commission</th><th>Versé</th><th>Solde dû</th><th></th></tr></thead><tbody>' +
-        (list.map(function (s) {
-          return '<tr><td><strong>' + esc(s.partner.name) + '</strong><br><span class="xs muted">' + esc(s.partner.company || '') + '</span></td><td class="num">' + Math.round(s.partner.commission_rate * 1000) / 10 + ' %</td><td class="num">' + s.clients + '</td><td class="num">' + fcfa(s.ventes) + '</td><td class="num">' + fcfa(s.earned) + '</td><td class="num">' + fcfa(s.paid) + '</td><td class="num"><strong>' + fcfa(s.balance) + '</strong></td><td>' + (s.balance > 0 ? '<button class="btn p sm" data-act="payoutNew" data-id="' + s.partner.id + '" data-max="' + s.balance + '">Verser</button>' : '') + '</td></tr>';
-        }).join('') || '<tr><td colspan="8" class="muted">Aucun partenaire.</td></tr>') + '</tbody></table></section>');
-    });
-  };
-  App.A.payoutNew = function (d) {
-    App.modal('<h2 class="sec-t">Verser une commission</h2><form class="stack" style="gap:12px" data-form="payoutNew" data-id="' + d.id + '">' +
-      '<div class="field"><label for="po-a">Montant (FCFA) — solde dû ' + fcfa(+d.max) + '</label><input id="po-a" name="amount" type="number" min="1" max="' + d.max + '" value="' + d.max + '" required></div>' +
-      '<div class="field"><label for="po-m">Moyen</label><select id="po-m" name="method"><option>Mobile Money</option><option>Espèces</option><option>Virement</option></select></div>' +
-      '<button class="btn p" type="submit">Enregistrer le versement</button><button class="linkbtn" type="button" data-act="closeM">Annuler</button></form>');
-  };
-  App.F.payoutNew = function (fd, form) {
-    return App.post('/admin/partners/' + form.getAttribute('data-id') + '/payout', { amount: +fd.get('amount'), method: fd.get('method') }).then(function () { App.modal(null); App.toast('Versement enregistré. Le partenaire est prévenu.'); App.render(); });
-  };
 
   S.demo = function () {
     return App.get('/admin/demo').then(function (d) {

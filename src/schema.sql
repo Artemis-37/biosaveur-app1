@@ -160,12 +160,15 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 CREATE SEQUENCE IF NOT EXISTS order_number_seq START 1001;
 
--- ===== v2 : fournisseurs, partenaires, démonstration =====
+-- ===== v2 : fournisseurs, démonstration =====
+-- Le rôle « partenaire » a été retiré : nettoyage des anciens comptes et de leurs versements.
+DELETE FROM users WHERE role='partenaire';
+DROP TABLE IF EXISTS partner_payouts;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS demo BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS company TEXT NOT NULL DEFAULT '';
 ALTER TABLE users ADD COLUMN IF NOT EXISTS commission_rate NUMERIC(5,4) NOT NULL DEFAULT 0.05;
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
-ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('client','livreur','admin','fournisseur','partenaire'));
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('client','livreur','admin','fournisseur'));
 
 ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
 
@@ -189,17 +192,6 @@ CREATE TABLE IF NOT EXISTS supply_orders (
 );
 CREATE INDEX IF NOT EXISTS supply_orders_supplier ON supply_orders(supplier_id);
 CREATE SEQUENCE IF NOT EXISTS supply_number_seq START 101;
-
--- versements de commissions aux partenaires
-CREATE TABLE IF NOT EXISTS partner_payouts (
-  id          SERIAL PRIMARY KEY,
-  partner_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  amount      INTEGER NOT NULL CHECK (amount > 0),
-  method      TEXT NOT NULL DEFAULT 'Mobile Money',
-  note        TEXT NOT NULL DEFAULT '',
-  created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
 
 -- v3 : photos téléversées depuis le back-office
 CREATE TABLE IF NOT EXISTS images (

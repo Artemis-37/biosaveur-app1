@@ -1,4 +1,4 @@
-/* Espaces fournisseur et partenaire. */
+/* Espace fournisseur. */
 (function () {
   'use strict';
   var App = window.App, ic = App.ic, esc = App.esc, fcfa = App.fcfa;
@@ -60,35 +60,4 @@
   App.F.supRefuse = function (fd, form) { return App.post('/supplier/orders/' + form.getAttribute('data-id') + '/refuse', { note: fd.get('note') }).then(function () { App.modal(null); App.toast('Réponse envoyée.'); App.render(); }); };
   App.A.supDeliver = function (d, el) { el.disabled = true; App.post('/supplier/orders/' + d.id + '/deliver').then(function () { App.toast('Livraison enregistrée : le stock BIOSAVEUR est mis à jour.'); App.render(); }).catch(function (e) { el.disabled = false; App.err(e); }); };
 
-  /* ---------- partenaire ---------- */
-  function bars(months) {
-    var max = 1; months.forEach(function (m) { max = Math.max(max, m.ventes); });
-    return '<div style="display:flex;align-items:flex-end;gap:10px;height:140px;border-bottom:1px solid var(--ligne);padding-top:10px">' + months.map(function (m) {
-      var h = Math.round(m.ventes / max * 120);
-      return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;justify-content:flex-end;height:100%"><span class="xs num muted">' + (m.ventes ? Math.round(m.ventes / 1000) + ' k' : '') + '</span><div title="' + fcfa(m.ventes) + '" style="width:100%;max-width:38px;height:' + Math.max(2, h) + 'px;background:var(--vf);border-radius:4px 4px 0 0"></div></div>';
-    }).join('') + '</div><div style="display:flex;gap:10px">' + months.map(function (m) { return '<span class="xs muted" style="flex:1;text-align:center">' + App.MOIS[+m.month.slice(5, 7) - 1] + '</span>'; }).join('') + '</div>';
-  }
-  App.route('partenaire', function () {
-    App.needStaff('partenaire');
-    return App.get('/partner/overview').then(function (d) {
-      var p = d.partner, pct = Math.round(p.commission_rate * 1000) / 10;
-      var link = location.origin.indexOf('http') === 0 && !App.native ? location.origin + '/#/inscription?parrain=' + encodeURIComponent(p.referral_code) : (App.apiBase || '') + '/#/inscription?parrain=' + encodeURIComponent(p.referral_code);
-      return head(p.company || p.name, 'Espace partenaire') +
-        '<div class="kpis">' + kpi(d.clients, 'Clients apportés') + kpi('<span style="font-size:18px">' + fcfa(d.commission_mois) + '</span>', 'Commission ce mois') + kpi('<span style="font-size:18px">' + fcfa(d.earned) + '</span>', 'Commission totale') + kpi('<span style="font-size:18px">' + fcfa(d.balance) + '</span>', 'À vous verser') + '</div></div></div>' +
-        '<div class="wrap stack" style="padding-block:16px 40px">' +
-        '<section class="parr"><div class="between"><h2 style="font-size:18px">Votre code partenaire</h2><strong>' + pct + ' % de commission</strong></div>' +
-        '<div class="row"><span class="cd">' + esc(p.referral_code) + '</span><button class="btn p sm" style="min-height:46px" data-act="copy" data-v="' + esc(p.referral_code) + '">Copier</button></div>' +
-        '<span class="small">Vos clients saisissent ce code en créant leur compte, ou utilisent votre lien : <span style="user-select:all;word-break:break-all">' + esc(link) + '</span>. Vous touchez ' + pct + ' % de chacune de leurs commandes livrées (hors frais de livraison).</span>' +
-        '<div><button class="btn p sm" data-act="copy" data-v="' + esc(link) + '">Copier le lien d’inscription</button></div></section>' +
-        '<div class="grid2" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));align-items:start">' +
-        '<section class="card pad stack" style="gap:8px"><h2 class="sec-t" style="font-size:17px">Ventes de vos clients · 6 mois</h2>' + bars(d.months) + '<span class="xs muted">Total des commandes livrées : ' + fcfa(d.ventes) + ' (' + d.commandes + ' commandes)</span></section>' +
-        '<section class="card pad"><h2 class="sec-t" style="font-size:17px;margin-bottom:6px">Commissions versées</h2>' +
-        (d.payouts.length ? d.payouts.map(function (x) { return '<div class="list-row"><span style="flex:1">' + App.fdate(x.created_at) + ' · ' + esc(x.method) + (x.note ? '<br><span class="xs muted">' + esc(x.note) + '</span>' : '') + '</span><strong class="num" style="color:var(--ok)">' + fcfa(x.amount) + '</strong></div>'; }).join('') : '<p class="muted small">Aucun versement pour le moment.</p>') +
-        '<div class="sum tot" style="margin-top:8px"><span>Reste à verser</span><span class="num">' + fcfa(d.balance) + '</span></div></section></div>' +
-        '<section class="card pad"><h2 class="sec-t" style="font-size:17px;margin-bottom:6px">Vos clients</h2><div class="tbl"><table style="min-width:520px"><thead><tr><th>Client</th><th>Commune</th><th>Inscrit le</th><th>Commandes livrées</th><th style="text-align:right">Ventes</th><th style="text-align:right">Votre commission</th></tr></thead><tbody>' +
-        (d.clientsList.length ? d.clientsList.map(function (c) { return '<tr><td>' + esc(c.name) + '</td><td>' + esc(c.commune) + '</td><td>' + App.fdate(c.created_at) + '</td><td class="num">' + c.commandes + '</td><td class="num" style="text-align:right">' + fcfa(c.ventes) + '</td><td class="num" style="text-align:right;font-weight:700;color:var(--vf)">' + fcfa(Math.round(c.ventes * p.commission_rate)) + '</td></tr>'; }).join('') : '<tr><td colspan="6" class="muted">Partagez votre code pour apporter vos premiers clients.</td></tr>') +
-        '</tbody></table></div></section></div>';
-    });
-  });
-  App.routes.partenaire.shell = 'staff';
 })();

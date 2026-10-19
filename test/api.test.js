@@ -164,27 +164,12 @@ test('fournisseur : approvisionnement demandé, confirmé, livré → stock augm
   assert.equal((await sup2('POST', `/supplier/orders/${oid}/confirm`)).status, 404);
 });
 
-test('partenaire : clients apportés, commission et versement', async () => {
-  const par = agent();
-  let r = await par('POST', '/auth/login', { phone: '0700000004', password: 'demo1234' });
-  assert.equal(r.body.user.role, 'partenaire');
-  const ov = (await par('GET', '/partner/overview')).body;
-  assert.ok(ov.clients >= 3, 'clients apportés');
-  assert.equal(ov.earned, Math.round(ov.ventes * 0.05));
-  assert.match(ov.clientsList[0].name, /\s\S\.$/, 'nom de famille abrégé');
-  const admin = agent();
-  await admin('POST', '/auth/login', { phone: '0700000000', password: 'demo1234' });
-  r = await admin('POST', `/admin/partners/${ov.partner.id}/payout`, { amount: ov.balance + 1 });
-  assert.equal(r.status, 400, 'versement supérieur au solde refusé');
-  if (ov.balance > 0) {
-    r = await admin('POST', `/admin/partners/${ov.partner.id}/payout`, { amount: 1000 });
-    assert.equal(r.status, 200);
-    assert.equal((await par('GET', '/partner/overview')).body.paid, ov.paid + 1000);
-  }
-  // un client ne peut pas voir l'espace partenaire
+test('le rôle partenaire n’existe plus', async () => {
+  const r = await agent()('POST', '/auth/login', { phone: '0700000004', password: 'demo1234' });
+  assert.ok(r.status >= 400, 'compte supprimé');
   const c = agent();
   await c('POST', '/auth/login', { phone: '0700000001', password: 'demo1234' });
-  assert.equal((await c('GET', '/partner/overview')).status, 403);
+  assert.equal((await c('GET', '/partner/overview')).status, 404);
   assert.equal((await c('GET', '/supplier/overview')).status, 403);
 });
 

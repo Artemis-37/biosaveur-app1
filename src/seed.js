@@ -56,7 +56,6 @@ const DEMO_ACCOUNTS = [
   { role: 'client', name: 'Client Démo', phone: '0700000001', commune: 'Marcory', address: 'Zone 4, rue du Canal', landmark: 'Immeuble beige, 2e porte', lat: 5.2971, lng: -3.9862 },
   { role: 'livreur', name: 'Ibrahim Ouattara (livreur démo)', phone: '0700000002' },
   { role: 'fournisseur', name: 'Moussa Koné', company: 'Coopérative avicole de Bingerville', phone: '0700000003' },
-  { role: 'partenaire', name: 'Adjoua Brou', company: 'Superette Le Bon Coin · Cocody', phone: '0700000004' },
 ];
 
 // générateur pseudo-aléatoire reproductible
@@ -74,8 +73,6 @@ async function seedDemo() {
   // équipe complémentaire
   const driver2 = await ensureUser({ role: 'livreur', name: 'Awa Diallo (livreuse démo)', phone: '0700000012', password: DEMO_PASSWORD, demo: true });
   const supplier2 = await ensureUser({ role: 'fournisseur', name: 'Paul Assi', company: 'Coopérative d’Azaguié', phone: '0700000013', password: DEMO_PASSWORD, demo: true });
-  const partner2 = await ensureUser({ role: 'partenaire', name: 'Issa Traoré', company: 'Boutique Chez Issa · Yopougon', phone: '0700000014', password: DEMO_PASSWORD, demo: true });
-  await db.query('UPDATE users SET commission_rate=0.07 WHERE id=$1', [partner2]);
 
   // fournisseurs des produits
   await db.query("UPDATE products SET supplier_id=$1 WHERE supplier ILIKE '%Bingerville%' OR supplier ILIKE '%BIOSAVEUR%' OR supplier ILIKE '%Fumoir%'", [ids.fournisseur]);
@@ -83,15 +80,15 @@ async function seedDemo() {
 
   // clients fictifs
   const CL = [
-    ['Aya Kouassi', '0708123456', 'Cocody', 'Riviera 3, rue des Jardins', 'Portail vert après la boulangerie', 5.3612, -3.9681, ids.partenaire],
-    ['Koffi N’Guessan', '0544982107', 'Yopougon', 'Niangon Sud, près de la pharmacie', 'Face à la pharmacie Niangon', 5.3262, -4.0893, partner2],
+    ['Aya Kouassi', '0708123456', 'Cocody', 'Riviera 3, rue des Jardins', 'Portail vert après la boulangerie', 5.3612, -3.9681, null],
+    ['Koffi N’Guessan', '0544982107', 'Yopougon', 'Niangon Sud, près de la pharmacie', 'Face à la pharmacie Niangon', 5.3262, -4.0893, null],
     ['Serge Bamba', '0759886644', 'Plateau', 'Immeuble Alpha, 4e étage', 'Accueil de l’immeuble Alpha', 5.3239, -4.0187, null],
     ['Yao Konan', '0777102030', 'Abobo', 'Abobo Baoulé, carrefour Samaké', 'Derrière la station', 5.4236, -4.0198, null],
-    ['Mariam Traoré', '0123456789', 'Marcory', 'Zone 4, rue du Docteur Blanchard', 'Portail bleu', 5.2950, -3.9905, ids.partenaire],
+    ['Mariam Traoré', '0123456789', 'Marcory', 'Zone 4, rue du Docteur Blanchard', 'Portail bleu', 5.2950, -3.9905, null],
     ['Fatou Diabaté', '0501020304', 'Treichville', 'Avenue 12, rue 21', 'À côté de la mosquée', 5.2958, -4.0069, null],
     ['Jean-Marc Ehui', '0711223344', 'Bingerville', 'Cité Feh Kessé, villa 18', 'Portail noir', 5.3561, -3.8912, null],
-    ['Awa Coulibaly', '0140506070', 'Koumassi', 'Remblais, derrière le marché', '', 5.2934, -3.9527, partner2],
-    ['Didier Yapi', '0767890123', 'Cocody', 'Angré 8e tranche, villa 45', 'Près du château d’eau', 5.3950, -3.9890, ids.partenaire],
+    ['Awa Coulibaly', '0140506070', 'Koumassi', 'Remblais, derrière le marché', '', 5.2934, -3.9527, null],
+    ['Didier Yapi', '0767890123', 'Cocody', 'Angré 8e tranche, villa 45', 'Près du château d’eau', 5.3950, -3.9890, null],
     ['Nadia Kacou', '0556677889', 'Port-Bouët', 'Gonzagueville, rue des Pêcheurs', 'Maison jaune', 5.2560, -3.9350, null],
   ];
   const clients = [ids.client];
@@ -190,8 +187,6 @@ async function seedDemo() {
       [num.n, sid, prods[pi].id, prods[pi].name, qty, Math.round(prods[pi].price * 0.62), isoDate(addDays(due)), st, ids.admin, addDays(due - 4),
         st !== 'demandee' ? addDays(due - 3) : null, st === 'livree' ? addDays(due) : null]);
   }
-  // commissions déjà versées
-  await db.query("INSERT INTO partner_payouts(partner_id,amount,method,note,created_by,created_at) VALUES ($1,15000,'Mobile Money','Commissions août',$2,$3)", [ids.partenaire, ids.admin, addDays(-40)]);
 
   // messages et notifications
   const msg = (uid, team, body, d, read = true) => db.query('INSERT INTO messages(user_id,from_team,author_id,body,read,created_at) VALUES ($1,$2,$3,$4,$5,$6)', [uid, team, team ? ids.admin : uid, body, read, addDays(d)]);
@@ -206,7 +201,6 @@ async function seedDemo() {
   await note(ids.client, 'Versement de cotisation reçu : 4 000 FCFA.', -7);
   await note(ids.client, 'Votre commande est en route.', 0);
   await note(ids.fournisseur, 'Nouvelle commande d’approvisionnement : 30 × Gésiers de poulet.', -1);
-  await note(ids.partenaire, 'Nouveau client apporté : Didier Yapi.', -5);
 
   await db.setSetting('objectif_mensuel', '150000');
   console.log('[démo] données de démonstration créées');

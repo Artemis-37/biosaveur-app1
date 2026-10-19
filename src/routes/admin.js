@@ -93,11 +93,11 @@ r.post('/upload', h(async (req, res) => {
 
 // --- équipe (livreurs, admins) ---
 r.get('/staff', h(async (req, res) => {
-  res.json(await db.many("SELECT id,role,name,company,phone,active,created_at,last_active,commission_rate FROM users WHERE role IN ('livreur','admin','fournisseur','partenaire') ORDER BY role, name"));
+  res.json(await db.many("SELECT id,role,name,company,phone,active,created_at,last_active,commission_rate FROM users WHERE role IN ('livreur','admin','fournisseur') ORDER BY role, name"));
 }));
 
 r.post('/staff', h(async (req, res) => {
-  const role = ['admin', 'livreur', 'fournisseur', 'partenaire'].includes(req.body.role) ? req.body.role : 'livreur';
+  const role = ['admin', 'livreur', 'fournisseur'].includes(req.body.role) ? req.body.role : 'livreur';
   const name = str(req.body.name, 80);
   const phone = normPhone(req.body.phone);
   const password = String(req.body.password || '');
@@ -112,7 +112,7 @@ r.post('/staff', h(async (req, res) => {
 r.put('/staff/:id/password', h(async (req, res) => {
   const pw = String(req.body.password || '');
   if (pw.length < 6) throw bad('Mot de passe trop court.');
-  await db.query("UPDATE users SET password_hash=$2 WHERE id=$1 AND role IN ('livreur','admin','fournisseur','partenaire')", [int(req.params.id), await hash(pw)]);
+  await db.query("UPDATE users SET password_hash=$2 WHERE id=$1 AND role IN ('livreur','admin','fournisseur')", [int(req.params.id), await hash(pw)]);
   res.json({ ok: true });
 }));
 
@@ -325,35 +325,6 @@ r.put('/supply/:id/cancel', h(async (req, res) => {
   if (!o || !['demandee', 'confirmee'].includes(o.status)) throw bad('Commande non annulable.');
   await db.query("UPDATE supply_orders SET status='annulee' WHERE id=$1", [o.id]);
   await notify(o.supplier_id, `Commande ${o.number} annulée par BIOSAVEUR.`);
-  res.json({ ok: true });
-}));
-
-// --- partenaires ---
-const { partnerStats } = require('./partner');
-r.get('/partners', h(async (req, res) => {
-  const list = await db.many("SELECT id FROM users WHERE role='partenaire' ORDER BY name");
-  const out = [];
-  for (const p of list) out.push(await partnerStats(p.id));
-  res.json(out);
-}));
-
-r.post('/partners/:id/payout', h(async (req, res) => {
-  const pid = int(req.params.id);
-  const st = await partnerStats(pid);
-  if (!st) throw notFound('Partenaire introuvable.');
-  const amount = int(req.body.amount);
-  if (amount <= 0 || amount > st.balance) throw bad(`Montant invalide (solde dû : ${fcfa(st.balance)}).`);
-  const method = ['Mobile Money', 'Espèces', 'Virement'].includes(req.body.method) ? req.body.method : 'Mobile Money';
-  await db.query('INSERT INTO partner_payouts(partner_id,amount,method,note,created_by) VALUES ($1,$2,$3,$4,$5)', [pid, amount, method, str(req.body.note, 200), req.user.id]);
-  await notify(pid, `Commission versée : ${fcfa(amount)} (${method}).`);
-  await audit(req.user.id, 'commission versée', `${st.partner.name} · ${fcfa(amount)}`);
-  res.json({ ok: true });
-}));
-
-r.put('/partners/:id/rate', h(async (req, res) => {
-  const rate = Number(req.body.rate);
-  if (!(rate >= 0 && rate <= 0.5)) throw bad('Taux entre 0 et 50 %.');
-  await db.query("UPDATE users SET commission_rate=$2 WHERE id=$1 AND role='partenaire'", [int(req.params.id), rate]);
   res.json({ ok: true });
 }));
 

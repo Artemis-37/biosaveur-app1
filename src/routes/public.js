@@ -87,7 +87,7 @@ r.post('/auth/register', h(async (req, res) => {
 
   let referrer = null;
   if (ref) {
-    referrer = await db.one("SELECT id, role FROM users WHERE referral_code=$1 AND role IN ('client','partenaire') AND active", [ref]);
+    referrer = await db.one("SELECT id, role FROM users WHERE referral_code=$1 AND role='client' AND active", [ref]);
     if (!referrer) throw bad('Code de parrainage inconnu.');
   }
   const u = await db.tx(async (c) => {
