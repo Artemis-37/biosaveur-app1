@@ -156,7 +156,7 @@
           return '<tr><td><strong>' + esc(c.name) + '</strong><br><span class="xs muted">' + esc(c.referral_code) + (c.active ? '' : ' · désactivé') + '</span></td><td class="num">' + App.phone(c.phone) + '</td>' +
             '<td class="small">' + esc(c.commune) + '<br><span class="muted">' + esc(c.address) + '</span>' + (c.lat != null ? '<br><a href="' + M.gDir(c) + '" target="_blank" rel="noopener">Voir sur la carte</a>' : '<br><span class="muted">Pas de position</span>') + '</td>' +
             '<td>' + App.fdate(c.created_at) + '</td><td>' + App.ago(c.last_active) + (inact ? '<br><span class="pill err">Inactif</span>' : '') + '</td><td>' + cot + '</td><td class="num">' + c.livraisons + '</td>' +
-            '<td><div class="row" style="gap:6px">' + (inact ? '<button class="btn o sm" data-act="relance" data-id="' + c.id + '">Relancer</button>' : '') + '<button class="btn o sm" data-act="nav" data-h="#/admin/messages/' + c.id + '">Écrire</button></div></td></tr>';
+            '<td><div class="row" style="gap:6px">' + (inact ? '<button class="btn o sm" data-act="relance" data-id="' + c.id + '">Relancer</button>' : '') + '<a class="btn o sm" target="_blank" rel="noopener" href="' + wa(c.phone, 'Bonjour ' + c.name.split(' ')[0] + ', ') + '">WhatsApp</a>' + '<button class="btn o sm" data-act="nav" data-h="#/admin/messages/' + c.id + '">Écrire</button></div></td></tr>';
         }).join('') + '</tbody></table></section>');
     });
   };
@@ -378,24 +378,33 @@
   App.A.calDay = function (d) { AV.day = d.day; App.go('#/admin/commandes'); };
 
   /* ---------- SMS & annonces groupées ---------- */
+  function wa(phone, text) { return 'https://wa.me/225' + String(phone).replace(/\D/g, '').slice(-10) + (text ? '?text=' + encodeURIComponent(text) : ''); }
   var AUD = { tous: 'Tous les clients', inactifs: 'Clients inactifs (30 jours)', cotisation_complete: 'Cotisation complète (à livrer)', cotisation_active: 'Cotisation en cours' };
   S.annonces = function () {
     return App.get('/admin/announcements').then(function (d) {
       var opts = Object.keys(AUD).map(function (k) { return '<option value="' + k + '">' + AUD[k] + ' (' + d.counts[k] + ')</option>'; }).join('') +
         App.cfg.communes.map(function (c) { return '<option value="commune:' + esc(c) + '">Commune : ' + esc(c) + '</option>'; }).join('');
       return frame('annonces', head('SMS & annonces', 'Écrire à un groupe de clients') +
-        '<div class="note info small">Le message arrive dans les notifications de l’appli du client (et en notification push s’il l’a activée). L’envoi par SMS opérateur nécessite un contrat avec un fournisseur de SMS : il n’est pas branché pour l’instant.</div>' +
+        '<div class="note info small">Le message arrive dans les notifications de l’appli du client (et en notification push s’il l’a activée). Après l’envoi, une liste WhatsApp vous permet de joindre les mêmes clients par WhatsApp (le SMS opérateur n’est pas branché).</div>' +
         '<section class="card pad stack" style="gap:12px"><form class="stack" style="gap:12px" data-form="annonce">' +
         '<div class="field"><label for="an-a">Destinataires</label><select id="an-a" name="audience">' + opts + '</select></div>' +
         '<div class="field"><label for="an-b">Message (300 caractères max.)</label><textarea id="an-b" name="body" maxlength="300" required placeholder="Ex. Poulet fermier en promotion samedi : commandez avant vendredi 18h."></textarea></div>' +
-        '<button class="btn p" type="submit">Envoyer</button></form></section>' +
-        '<section class="card pad"><h2 class="sec-t" style="font-size:16px;margin-bottom:6px">Historique</h2>' + (d.history.length ? '<div class="tbl"><table><thead><tr><th>Date</th><th>Public</th><th>Message</th><th>Clients</th></tr></thead><tbody>' + d.history.map(function (a) {
-          return '<tr><td>' + App.fdt(a.created_at) + '</td><td class="small">' + esc(AUD[a.audience] || a.audience.replace('commune:', 'Commune : ')) + '</td><td>' + esc(a.body) + '</td><td class="num">' + a.recipients + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<p class="muted small">Aucune annonce envoyée.</p>') + '</section>');
+        '<button class="btn p" type="submit">Envoyer dans l’appli</button></form></section>' +
+        '<section class="card pad"><h2 class="sec-t" style="font-size:16px;margin-bottom:6px">Historique</h2>' + (d.history.length ? '<div class="tbl"><table><thead><tr><th>Date</th><th>Public</th><th>Message</th><th>Clients</th><th></th></tr></thead><tbody>' + d.history.map(function (a) {
+          return '<tr><td>' + App.fdt(a.created_at) + '</td><td class="small">' + esc(AUD[a.audience] || a.audience.replace('commune:', 'Commune : ')) + '</td><td>' + esc(a.body) + '</td><td class="num">' + a.recipients + '</td><td><button class="btn o sm" data-act="waList" data-audience="' + esc(a.audience) + '" data-body="' + esc(a.body) + '">WhatsApp</button></td></tr>'; }).join('') + '</tbody></table></div>' : '<p class="muted small">Aucune annonce envoyée.</p>') + '</section>');
     });
+  };
+  // Liste des destinataires avec un lien WhatsApp prérempli (le SMS opérateur n'étant pas branché).
+  App.A.waList = function (d) {
+    App.get('/admin/announcements/recipients?audience=' + encodeURIComponent(d.audience)).then(function (list) {
+      App.modal('<h2 class="sec-t">Envoyer aussi par WhatsApp</h2><p class="small muted" style="margin:0">Touchez un nom : WhatsApp s’ouvre avec le message prêt à envoyer.</p>' +
+        '<div style="max-height:50vh;overflow:auto" class="stack">' + list.map(function (c) { return '<a class="list-row" target="_blank" rel="noopener" href="' + wa(c.phone, d.body) + '" style="text-decoration:none"><span style="flex:1"><strong>' + esc(c.name) + '</strong><br><span class="xs muted">' + App.phone(c.phone) + '</span></span><span class="pill ok">WhatsApp</span></a>'; }).join('') + '</div>' +
+        '<button class="linkbtn" type="button" data-act="closeM">Fermer</button>');
+    }).catch(App.err);
   };
   App.F.annonce = function (fd, form) {
     if (!window.confirm('Envoyer ce message ?')) return Promise.resolve();
-    return App.post('/admin/announcements', { audience: fd.get('audience'), body: fd.get('body') }).then(function (a) { form.reset(); App.toast('Message envoyé à ' + a.recipients + ' client(s).'); App.render(); });
+    return App.post('/admin/announcements', { audience: fd.get('audience'), body: fd.get('body') }).then(function (a) { form.reset(); App.toast('Message envoyé à ' + a.recipients + ' client(s).'); App.render(); App.A.waList({ audience: a.audience, body: a.body }); });
   };
 
   /* ---------- modification d'un compte équipe + sauvegarde ---------- */

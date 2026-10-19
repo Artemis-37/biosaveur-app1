@@ -17,10 +17,15 @@ async function nextNumber(client) {
   return r.rows[0].n;
 }
 
-function checkDelivery(day, slot) {
+function checkDelivery(day, slot, pre = false) {
   const today = isoDate();
-  const max = isoDate(addDays(14));
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day < today || day > max) throw bad('Choisissez un jour de livraison dans les 14 prochains jours.');
+  if (pre) {
+    // précommande événementielle : 3 jours minimum d'avance, 60 jours maximum
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day < isoDate(addDays(3)) || day > isoDate(addDays(60))) throw bad('Les commandes événementielles se précommandent au moins 3 jours à l’avance (60 jours maximum).');
+  } else {
+    const max = isoDate(addDays(14));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day < today || day > max) throw bad('Choisissez un jour de livraison dans les 14 prochains jours.');
+  }
   if (!config.shop.slots.includes(slot)) throw bad('Créneau horaire invalide.');
 }
 
@@ -31,7 +36,9 @@ function checkDelivery(day, slot) {
 async function createOrder(user, { items, day, slot, pay_method }, fromApp = false) {
   if (!Array.isArray(items) || !items.length) throw bad('Votre panier est vide.');
   if (items.length > 30) throw bad('Trop d’articles dans une même commande.');
-  checkDelivery(day, slot);
+  const pids = items.map((it) => parseInt(it.product_id, 10)).filter((n) => n > 0);
+  const isPre = pids.length > 0 && !!(await db.one("SELECT 1 FROM products WHERE id = ANY($1) AND category='evenements'", [pids]));
+  checkDelivery(day, slot, isPre);
   if (!['livraison', 'cinetpay', 'cotisation'].includes(pay_method)) throw bad('Mode de paiement invalide.');
   if (!user.address || !user.commune) throw bad('Renseignez votre adresse de livraison dans votre profil.');
   if (pay_method === 'cinetpay' && !(await onlinePaymentEnabled())) throw bad('Le paiement en ligne n’est pas encore disponible. Choisissez le paiement à la livraison.');

@@ -109,7 +109,14 @@
       return r.json().catch(function () { return {}; }).then(function (j) {
         if (!r.ok) {
           var e = new Error(j.error || 'Erreur ' + r.status); e.status = r.status;
-          if (r.status === 401) { App.cfg.user = null; if (tk) App.token(null); }
+          if (r.status === 401) {
+            var had = !!(App.cfg.user || tk);
+            App.cfg.user = null; if (tk) App.token(null);
+            if (had && !/^#\/(connexion|inscription)/.test(location.hash)) {
+              App.toast('Votre session a expiré. Veuillez vous reconnecter.');
+              App.go('#/connexion?expire=1&suite=' + encodeURIComponent(location.hash));
+            }
+          }
           throw e;
         }
         return j;

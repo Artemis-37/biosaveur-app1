@@ -318,6 +318,12 @@ r.get('/announcements', h(async (req, res) => {
   for (const [k, w] of Object.entries(AUDIENCES)) counts[k] = (await db.one(`SELECT count(*)::int AS n FROM users WHERE ${w} AND active`)).n;
   res.json({ counts, history: await db.many('SELECT id, audience, body, recipients, created_at FROM announcements ORDER BY id DESC LIMIT 50') });
 }));
+r.get('/announcements/recipients', h(async (req, res) => {
+  const aud = String(req.query.audience || 'tous');
+  const where = AUDIENCES[aud] || (aud.startsWith('commune:') && COMMUNES.includes(aud.slice(8)) ? "role='client' AND commune=$1" : null);
+  if (!where) throw bad('Public inconnu.');
+  res.json(await db.many(`SELECT id, name, phone FROM users WHERE ${where} AND active ORDER BY name LIMIT 300`, where.includes('$1') ? [aud.slice(8)] : []));
+}));
 r.post('/announcements', h(async (req, res) => {
   const body = str(req.body.body, 300);
   const aud = String(req.body.audience || 'tous');

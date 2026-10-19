@@ -130,6 +130,7 @@
         '</div>' +
         '<div class="side-promos">' +
         '<a class="promo w" style="text-decoration:none" href="#/parrainage">' + ic('gift', 'l') + '<strong>Parrainez vos proches</strong><span>' + App.cfg.referralPoints + ' points par filleul, convertibles en FCFA.</span></a>' +
+        '<a class="promo w" style="text-decoration:none" href="#/portions">' + ic('list', 'l') + '<strong>Calculateur de portions</strong><span>Combien de poulets pour vos invités ?</span></a>' +
         '<a class="promo y" style="text-decoration:none" href="#/cat/evenements">' + ic('cal', 'l') + '<strong>Précommande événements</strong><span>Fêtes, mariages, baptêmes : réservez à l’avance.</span></a>' +
         '</div></div>' +
         '<div class="cats-m">' + CATS.map(function (x) { return '<a href="#/cat/' + x.id + '" style="text-decoration:none;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:var(--encre);text-align:center"><span class="o">' + ic(x.icon) + '</span>' + esc(x.label) + '</a>'; }).join('') + '</div>' +
@@ -213,8 +214,26 @@
   App.A.pAdd = function () { Cart.add(PV.id, PV.opt, PV.qty); App.toast(PV.qty + ' × ' + PV.name + ' ajouté au panier.'); };
 
   /* ---------- panier & commande ---------- */
-  var CV = { day: 0, slot: 1, pay: 'livraison' };
+  var CV = { day: 0, slot: 1, pay: 'livraison', preDay: '' };
   function days() { var a = []; for (var i = 0; i < 6; i++) a.push(App.iso(App.addDays(i))); return a; }
+  /* ---------- calculateur de portions ---------- */
+  var PT = { people: 6, appetite: 1, kind: 'entier' };
+  App.route('portions', function () {
+    var per = [0.25, 0.32, 0.42][PT.appetite];                 // kg de viande cuite à servir par personne
+    var yieldP = PT.kind === 'entier' ? 0.55 : 0.8;              // part consommable d'un poulet entier / de découpes
+    var kg = Math.ceil(PT.people * per / yieldP * 10) / 10;      // kg de poulet à acheter
+    var n = Math.max(1, Math.ceil(kg / 1.5));                    // poulets entiers de ~1,5 kg
+    return '<section class="card pad stack" style="gap:14px;max-width:560px"><h1 class="sec-t">Calculateur de portions</h1><p class="muted" style="margin:0">Combien de poulet pour vos invités ? Indiquez le nombre de personnes et l’appétit.</p>' +
+      '<div class="field"><label for="pp">Nombre de personnes</label><input id="pp" type="number" min="1" max="500" value="' + PT.people + '" data-chg="ptPeople" style="min-height:46px"></div>' +
+      '<div class="field"><span style="font-weight:600;font-size:14px">Appétit</span><div class="chips">' + ['Léger', 'Normal', 'Gros mangeurs'].map(function (t, i) { return '<button class="chip" data-act="ptApp" data-i="' + i + '" aria-pressed="' + (PT.appetite === i) + '">' + t + '</button>'; }).join('') + '</div></div>' +
+      '<div class="field"><span style="font-weight:600;font-size:14px">Type de produit</span><div class="chips">' + [['entier', 'Poulets entiers'], ['decoupes', 'Découpes']].map(function (t) { return '<button class="chip" data-act="ptKind" data-k="' + t[0] + '" aria-pressed="' + (PT.kind === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div></div>' +
+      '<div class="card pad" style="background:var(--vf);color:#fff"><span class="small" style="color:var(--sur-vf)">Il vous faut environ</span><br><strong style="font-size:28px;color:var(--j)" class="num">' + n + ' poulet' + (n > 1 ? 's' : '') + '</strong><br><span class="small">soit ' + String(kg).replace('.', ',') + ' kg de ' + (PT.kind === 'entier' ? 'poulet entier' : 'découpes') + ' (poulet entier ≈ 1,5 kg)</span></div>' +
+      '<a class="btn p" href="#/cat/' + (PT.kind === 'entier' ? 'entier' : 'decoupes') + '">Voir les produits</a><a class="linkbtn" href="#/cat/evenements">Pour un grand événement : précommander un pack fête</a></section>';
+  });
+  App.A.ptApp = function (d) { PT.appetite = +d.i; App.render(); };
+  App.A.ptKind = function (d) { PT.kind = d.k; App.render(); };
+  App.A.ptPeople = function (d, el) { PT.people = Math.max(1, Math.min(500, parseInt(el.value, 10) || 1)); App.render(); };
+
   App.route('panier', function () {
     var cart = Cart.items();
     if (!cart.length) return '<div class="card empty"><span class="o">' + ic('cart', 'l') + '</span><h1 class="sec-t">Votre panier est vide</h1><span class="muted">Parcourez les offres du jour pour commencer.</span><a class="btn p" href="#/">Voir les offres</a></div>';
@@ -230,6 +249,10 @@
       if (CV.pay === 'cotisation' && !canCot) CV.pay = 'livraison';
       if (CV.pay === 'cinetpay' && !App.cfg.onlinePayment) CV.pay = 'livraison';
       var ds = days();
+      var isPre = valid.some(function (c) { return by[c.pid].category === 'evenements'; });
+      var minPre = App.iso(App.addDays(3)), maxPre = App.iso(App.addDays(60));
+      CV.pre = isPre;
+      if (isPre && (!CV.preDay || CV.preDay < minPre)) CV.preDay = minPre;
       var lines = valid.map(function (c, i) {
         var p = by[c.pid];
         var warn = c.q > p.stock ? '<div class="xs" style="color:var(--err)">Il n’en reste que ' + p.stock + '.</div>' : '';
@@ -244,7 +267,8 @@
       return '<div class="two"><div class="mainc">' +
         '<section class="card pad"><h1 class="sec-t" style="margin-bottom:6px">Panier (' + Cart.count() + ')</h1>' + lines + '</section>' +
         '<section class="card pad stack" style="gap:12px"><div class="between"><h2 class="sec-t" style="font-size:17px">Livraison</h2>' + (u ? '<a class="linkbtn" href="#/profil">Modifier l’adresse</a>' : '') + '</div>' + addr +
-        '<span style="font-weight:700">Jour de livraison</span><div class="chips">' + ds.map(function (d, i) { return '<button class="chip" data-act="setDay" data-i="' + i + '" aria-pressed="' + (CV.day === i) + '">' + App.fday(d) + '</button>'; }).join('') + '</div>' +
+        (isPre ? '<div class="note info small"><strong>Précommande événementielle</strong> : livraison au moins 3 jours après la commande (60 jours maximum).</div><label for="pre-d" style="font-weight:700">Date de l’événement / livraison</label><input id="pre-d" type="date" min="' + minPre + '" max="' + maxPre + '" value="' + CV.preDay + '" data-chg="setPre" style="min-height:46px;border:1.5px solid #c9d3cf;border-radius:8px;padding:0 10px;max-width:240px">' : '') +
+        (isPre ? '' : '<span style="font-weight:700">Jour de livraison</span><div class="chips">') + (isPre ? [] : ds).map(function (d, i) { return '<button class="chip" data-act="setDay" data-i="' + i + '" aria-pressed="' + (CV.day === i) + '">' + App.fday(d) + '</button>'; }).join('') + (isPre ? '' : '</div>') +
         '<span style="font-weight:700">Créneau horaire</span><div class="slots">' + App.cfg.slots.map(function (s, i) { return '<button class="chip" data-act="setSlot" data-i="' + i + '" aria-pressed="' + (CV.slot === i) + '">' + s + '</button>'; }).join('') + '</div></section>' +
         '<section class="card pad" style="padding-bottom:4px"><h2 class="sec-t" style="font-size:17px;margin-bottom:8px">Paiement</h2>' +
         radio('livraison', 'Paiement à la livraison', 'Espèces ou Mobile Money au livreur', true) +
@@ -254,7 +278,7 @@
         '<aside class="side sticky card pad stack" style="gap:6px"><h2 class="sec-t" style="font-size:17px;margin-bottom:6px">Récapitulatif</h2>' +
         '<div class="sum"><span>Sous-total</span><span class="num">' + fcfa(sub) + '</span></div>' +
         '<div class="sum"><span>Livraison</span><span class="num">' + fcfa(fee) + '</span></div>' +
-        '<div class="sum"><span>Créneau</span><span>' + App.fday(ds[CV.day]) + ' · ' + App.cfg.slots[CV.slot] + '</span></div>' +
+        '<div class="sum"><span>Créneau</span><span>' + App.fday(isPre ? CV.preDay : ds[CV.day]) + ' · ' + App.cfg.slots[CV.slot] + '</span></div>' +
         '<div class="sum tot"><span>Total</span><span class="num">' + fcfa(tot) + '</span></div>' +
         (u ? '<button class="btn p full" style="margin-top:10px" data-act="checkout"' + (u.address ? '' : ' disabled') + '>' + (CV.pay === 'cinetpay' ? 'Payer ' + fcfa(tot) : 'Valider la commande') + '</button>'
           : '<a class="btn p full" style="margin-top:10px" href="#/connexion?suite=' + encodeURIComponent('#/panier') + '">Se connecter pour commander</a>') +
@@ -263,12 +287,13 @@
   });
   App.A.cartQ = function (d) { var c = Cart.items(), it = c[+d.i]; if (!it) return; it.q = Math.max(1, it.q + (+d.d)); Cart.save(c); App.render(); };
   App.A.cartDel = function (d) { var c = Cart.items(); c.splice(+d.i, 1); Cart.save(c); App.render(); };
+  App.A.setPre = function (d, el) { CV.preDay = el.value; App.render(); };
   App.A.setDay = function (d) { CV.day = +d.i; App.render(); };
   App.A.setSlot = function (d) { CV.slot = +d.i; App.render(); };
   App.A.setPay = function (d, el) { CV.pay = el.value; App.render(); };
   App.A.checkout = function (d, el) {
     el.disabled = true;
-    var body = { items: Cart.items().map(function (c) { return { product_id: c.pid, option: c.opt, qty: c.q }; }), day: days()[CV.day], slot: App.cfg.slots[CV.slot], pay_method: CV.pay };
+    var body = { items: Cart.items().map(function (c) { return { product_id: c.pid, option: c.opt, qty: c.q }; }), day: CV.pre ? CV.preDay : days()[CV.day], slot: App.cfg.slots[CV.slot], pay_method: CV.pay };
     App.post('/client/orders', body).then(function (r) {
       if (r.payment_url) { App.openPayment(r.payment_url, r.transaction_id); return; }
       Cart.clear();
@@ -565,6 +590,7 @@
         return '<button class="demo-role" data-act="demoLogin" data-phone="' + esc(a.phone) + '" data-pw="' + esc(a.password) + '"><strong>' + esc(App.ROLE_LABEL[a.role]) + '</strong><span>' + esc(a.name) + '</span><code>' + App.phone(a.phone) + ' · ' + esc(a.password) + '</code></button>';
       }).join('') + '</div></div>' : '';
     var suite = esc(r.q.suite || '');
+    var expired = r.q.expire ? '<div class="note" role="alert">Votre session a expiré. Reconnectez-vous pour continuer.</div>' : '';
     var body = mode === 'login'
       ? '<form class="stack" style="gap:12px" data-form="login" data-suite="' + suite + '"><div class="field"><label for="lp">Téléphone ou e-mail</label><input id="lp" name="phone" autocomplete="username" autocapitalize="off" placeholder="07 00 00 00 00 ou nom@exemple.com" required></div>' +
         '<div class="field"><label for="lw">Mot de passe</label><input id="lw" name="password" type="password" autocomplete="current-password" required></div>' +
@@ -578,7 +604,7 @@
         '<div class="field"><label for="rr">Code de parrainage (facultatif)</label><input id="rr" name="referral" placeholder="BSV-XXXX" value="' + esc(r.q.parrain || '') + '"></div>' +
         '<button class="btn p" type="submit">Créer mon compte</button></form>';
     return '<div class="auth"><div class="card"><div class="tabs2"><button data-act="nav" data-h="#/connexion' + (suite ? '?suite=' + encodeURIComponent(r.q.suite) : '') + '" aria-pressed="' + (mode === 'login') + '">Se connecter</button><button data-act="nav" data-h="#/inscription' + (suite ? '?suite=' + encodeURIComponent(r.q.suite) : '') + '" aria-pressed="' + (mode !== 'login') + '">Créer un compte</button></div>' +
-      '<h1>' + (mode === 'login' ? 'Bon retour !' : 'Bienvenue chez BIOSAVEUR') + '</h1>' + body + '</div>' + demo + '</div>';
+      '<h1>' + (mode === 'login' ? 'Bon retour !' : 'Bienvenue chez BIOSAVEUR') + '</h1>' + (mode === 'login' ? expired : '') + body + '</div>' + demo + '</div>';
   }
   App.A.demoLogin = function (d) {
     App.post('/auth/login', { phone: d.phone, password: d.pw }).then(function (r) {

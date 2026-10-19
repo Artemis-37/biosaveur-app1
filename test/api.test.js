@@ -240,3 +240,17 @@ test('push : clé publique, abonnement, envoi sans erreur', async () => {
   await admin('POST', '/auth/login', { phone: '0700000000', password: 'demo1234' });
   assert.equal((await admin('POST', '/admin/announcements', { audience: 'tous', body: 'Test push sans erreur' })).status, 200);
 });
+
+test('précommande événementielle : 3 jours minimum, 60 jours maximum', async () => {
+  const c = agent();
+  await c('POST', '/auth/login', { phone: '0700000001', password: 'demo1234' });
+  const ev = (await c('GET', '/products')).body.find((p) => p.category === 'evenements');
+  const plus = (n) => new Date(Date.now() + n * 86400e3).toISOString().slice(0, 10);
+  const order = (day) => c('POST', '/client/orders', { items: [{ product_id: ev.id, qty: 1, option: ev.options[0] }], day, slot: '10h – 12h', pay_method: 'livraison' });
+  assert.equal((await order(plus(1))).status, 400, 'trop tôt');
+  assert.equal((await order(plus(70))).status, 400, 'trop tard');
+  const ok = await order(plus(30));
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  const norm = (await c('GET', '/products')).body.find((p) => p.category !== 'evenements' && p.stock > 1);
+  assert.equal((await c('POST', '/client/orders', { items: [{ product_id: norm.id, qty: 1 }], day: plus(30), slot: '10h – 12h', pay_method: 'livraison' })).status, 400, 'produit normal : 14 jours max');
+});
