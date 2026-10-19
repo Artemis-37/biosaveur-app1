@@ -3,6 +3,22 @@
 const webpush = require('web-push');
 const db = require('./db');
 
+// Firebase Cloud Messaging (appli Android) : compte de service dans FIREBASE_SERVICE_ACCOUNT (JSON ou JSON en base64).
+let fcm = null;
+function fcmInit() {
+  if (fcm !== null) return fcm;
+  fcm = false;
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (!raw) return fcm;
+  try {
+    const json = JSON.parse(raw.trim().startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8'));
+    const admin = require('firebase-admin');
+    const app = admin.initializeApp({ credential: admin.credential.cert(json) }, 'biosaveur');
+    fcm = admin.messaging(app);
+  } catch (e) { console.error('[push] FIREBASE_SERVICE_ACCOUNT invalide :', e.message); }
+  return fcm;
+}
+
 let ready = null;
 async function init() {
   if (ready) return ready;
@@ -27,6 +43,17 @@ async function publicKey() { return init(); }
 async function sendPush(userId, body) {
   try {
     await init();
+    const m = fcmInit();
+    if (m) {
+      const devs = await db.many('SELECT id, token FROM device_tokens WHERE user_id=$1', [userId]);
+      for (const d of devs) {
+        try {
+          await m.send({ token: d.token, notification: { title: 'BIOSAVEUR', body }, android: { priority: 'high', notification: { channelId: 'default' } } });
+        } catch (e) {
+          if (/registration-token-not-registered|invalid-argument|invalid-registration-token/.test(e.code || '')) await db.query('DELETE FROM device_tokens WHERE id=$1', [d.id]);
+        }
+      }
+    }
     const subs = await db.many('SELECT * FROM push_subs WHERE user_id=$1', [userId]);
     const payload = JSON.stringify({ title: 'BIOSAVEUR', body });
     for (const s of subs) {
@@ -38,4 +65,4 @@ async function sendPush(userId, body) {
     }
   } catch (e) { /* push indisponible : la notification reste visible dans l'appli */ }
 }
-module.exports = { publicKey, sendPush };
+module.exports = { publicKey, sendPush, fcmConfigured: () => !!fcmInit() };

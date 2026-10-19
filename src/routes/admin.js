@@ -316,7 +316,8 @@ const AUDIENCES = { tous: "role='client'", inactifs: "role='client' AND last_act
 r.get('/announcements', h(async (req, res) => {
   const counts = {};
   for (const [k, w] of Object.entries(AUDIENCES)) counts[k] = (await db.one(`SELECT count(*)::int AS n FROM users WHERE ${w} AND active`)).n;
-  res.json({ counts, history: await db.many('SELECT id, audience, body, recipients, created_at FROM announcements ORDER BY id DESC LIMIT 50') });
+  const withEmail = (await db.one("SELECT count(*)::int AS n FROM users WHERE role='client' AND active AND email_notifs AND email IS NOT NULL AND email <> ''")).n;
+  res.json({ mail: require('../mailer').configured, fcm: require('../push').fcmConfigured(), withEmail, counts, history: await db.many('SELECT id, audience, body, recipients, created_at FROM announcements ORDER BY id DESC LIMIT 50') });
 }));
 r.get('/announcements/recipients', h(async (req, res) => {
   const aud = String(req.query.audience || 'tous');

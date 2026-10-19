@@ -347,7 +347,7 @@
   };
   App.A.logout = function () {
     var done = function () { App.token(null); App.cfg.user = null; App.go('#/'); App.toast('Vous êtes déconnecté.'); };
-    App.post('/auth/logout').then(done, done);
+    (App.removePushToken ? App.removePushToken() : Promise.resolve()).then(function () { return App.post('/auth/logout'); }).then(done, done);
   };
 
   App.route('commandes', function () {
@@ -555,6 +555,7 @@
       '<div class="form-grid"><div class="field"><label for="pn">Nom complet</label><input id="pn" name="name" value="' + esc(u.name) + '" required maxlength="80"></div>' +
       '<div class="field"><label for="pt">Téléphone</label><input id="pt" value="' + App.phone(u.phone) + '" disabled></div></div>' +
       '<div class="field"><label for="pe">E-mail (facultatif, sert aussi à se connecter)</label><input id="pe" name="email" type="email" value="' + esc(u.email || '') + '" maxlength="120" autocomplete="email"></div>' +
+      '<label class="chk"><input type="checkbox" name="email_notifs"' + (u.email_notifs !== false ? ' checked' : '') + '> Recevoir mes notifications par e-mail (commande, livraison, cotisation)</label>' +
       '<div class="form-grid"><div class="field"><label for="pc">Commune</label><select id="pc" name="commune"><option value="">Choisir…</option>' + App.cfg.communes.map(function (x) { return '<option' + (u.commune === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></div>' +
       '<div class="field"><label for="pa">Adresse précise</label><input id="pa" name="address" value="' + esc(u.address) + '" required maxlength="200" placeholder="Quartier, rue, immeuble"></div></div>' +
       '<div class="field"><label for="pr">Point de repère pour le livreur</label><input id="pr" name="landmark" value="' + esc(u.landmark) + '" maxlength="200" placeholder="Ex. portail vert après la boulangerie"></div>' +
@@ -577,7 +578,7 @@
   App.A.avatarDel = function () { App.api('DELETE', '/client/me/avatar').then(function (u) { App.cfg.user = u; App.render(); }).catch(App.err); };
   App.A.locate = function () { if (App._locate) App._locate(); };
   App.F.profil = function (fd) {
-    var b = {}; fd.forEach(function (v, k) { b[k] = v; });
+    var b = {}; fd.forEach(function (v, k) { b[k] = v; }); b.email_notifs = !!fd.get('email_notifs');
     return App.put('/client/me', b).then(function (u) { App.cfg.user = u; App.toast('Profil et position enregistrés.'); });
   };
   App.F.pw = function (fd, form) { return App.put('/client/me/password', { current: fd.get('current'), next: fd.get('next') }).then(function () { form.reset(); App.toast('Mot de passe modifié.'); }); };

@@ -26,6 +26,14 @@ jobs:
           distribution: temurin
           java-version: 17
       - run: npm ci
+      - name: Notifications push (Firebase) — facultatif
+        run: |
+          if [ -n "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" ]; then
+            echo "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" | base64 -d > android/app/google-services.json
+            echo "google-services.json installé"
+          else
+            echo "Secret GOOGLE_SERVICES_JSON_BASE64 absent : appli sans push mobile"
+          fi
       - run: node scripts/prepare-app.js && npx cap sync android
 
       - name: APK de test (installation directe sur téléphone)

@@ -6,18 +6,43 @@ const assert = require('node:assert');
 
 process.env.SEED_DEMO = 'true';
 process.env.CINETPAY_SIMULATE = 'true';
+// faux serveur SMTP pour vérifier l'envoi des e-mails
+const net = require('node:net');
+const mails = [];
+const smtp = net.createServer((s) => {
+  let data = false, buf = '', cur = '';
+  s.write('220 test ESMTP\r\n');
+  s.on('data', (d) => {
+    buf += d.toString();
+    let i;
+    while ((i = buf.indexOf('\r\n')) >= 0) {
+      const line = buf.slice(0, i); buf = buf.slice(i + 2);
+      if (data) { if (line === '.') { data = false; mails.push(cur); cur = ''; s.write('250 ok\r\n'); } else cur += line + '\n'; continue; }
+      const u = line.toUpperCase();
+      if (u.startsWith('EHLO')) s.write('250-test\r\n250 AUTH PLAIN LOGIN\r\n');
+      else if (u.startsWith('AUTH')) s.write('235 ok\r\n');
+      else if (u.startsWith('DATA')) { data = true; s.write('354 go\r\n'); }
+      else if (u.startsWith('QUIT')) { s.write('221 bye\r\n'); s.end(); }
+      else s.write('250 ok\r\n');
+    }
+  });
+});
+smtp.listen(0, '127.0.0.1');
+process.env.SMTP_HOST = '127.0.0.1'; process.env.SMTP_USER = 'x@test'; process.env.SMTP_PASS = 'pw';
 const { app } = require('../src/server');
 const db = require('../src/db');
 const { seed } = require('../src/seed');
 
 let server, base;
 test.before(async () => {
+  await new Promise((r) => (smtp.listening ? r() : smtp.once('listening', r)));
+  process.env.SMTP_PORT = String(smtp.address().port);
   await db.migrate();
   await seed();
   await new Promise((r) => { server = app.listen(0, r); });
   base = `http://127.0.0.1:${server.address().port}/api`;
 });
-test.after(async () => { server.close(); await db.pool.end(); });
+test.after(async () => { smtp.close(); server.close(); await db.pool.end(); });
 
 function agent() {
   let cookie = '';
@@ -238,7 +263,11 @@ test('push : clé publique, abonnement, envoi sans erreur', async () => {
   assert.equal(r.status, 200);
   const admin = agent();
   await admin('POST', '/auth/login', { phone: '0700000000', password: 'demo1234' });
+  assert.equal((await c('POST', '/client/push/device', { token: 'short' })).status, 400);
+  const tok = 'fcm-token-de-test-' + 'x'.repeat(60);
+  assert.equal((await c('POST', '/client/push/device', { token: tok, platform: 'android' })).status, 200);
   assert.equal((await admin('POST', '/admin/announcements', { audience: 'tous', body: 'Test push sans erreur' })).status, 200);
+  assert.equal((await c('POST', '/client/push/device/remove', { token: tok })).status, 200);
 });
 
 test('précommande événementielle : 3 jours minimum, 60 jours maximum', async () => {
@@ -253,4 +282,24 @@ test('précommande événementielle : 3 jours minimum, 60 jours maximum', async 
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
   const norm = (await c('GET', '/products')).body.find((p) => p.category !== 'evenements' && p.stock > 1);
   assert.equal((await c('POST', '/client/orders', { items: [{ product_id: norm.id, qty: 1 }], day: plus(30), slot: '10h – 12h', pay_method: 'livraison' })).status, 400, 'produit normal : 14 jours max');
+});
+
+test('e-mail : notification envoyée au client qui en a un, sauf s\'il la désactive', async () => {
+  const c = agent();
+  const phone = `07${String(Date.now()).slice(-8)}`;
+  const email = `mail${Date.now()}@exemple.com`;
+  mails.length = 0;
+  await c('POST', '/auth/register', { name: 'Mail Test', phone, password: 'secret12', commune: 'Cocody', address: 'Rue', email });
+  await new Promise((r) => setTimeout(r, 3500));
+  const m = mails.find((x) => x.includes(email));
+  assert.ok(m, 'e-mail de bienvenue reçu');
+  assert.match(m, /Bienvenue chez BIOSAVEUR/);
+  const r = await c('PUT', '/client/me', { name: 'Mail Test', commune: 'Cocody', address: 'Rue', email, email_notifs: false });
+  assert.equal(r.body.email_notifs, false);
+  const admin = agent();
+  await admin('POST', '/auth/login', { phone: '0700000000', password: 'demo1234' });
+  mails.length = 0;
+  await admin('POST', '/admin/announcements', { audience: 'commune:Cocody', body: 'Annonce par e-mail test' });
+  await new Promise((r2) => setTimeout(r2, 3500));
+  assert.ok(!mails.some((x) => x.includes(email)), 'pas d’e-mail si désactivé');
 });

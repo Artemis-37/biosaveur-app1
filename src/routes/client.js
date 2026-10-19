@@ -30,9 +30,10 @@ r.put('/me', h(async (req, res) => {
   const email = b.email === undefined ? (req.user.email || '') : str(b.email, 120).toLowerCase();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw bad('Adresse e-mail invalide.');
   if (email && await db.one('SELECT 1 FROM users WHERE lower(email)=$1 AND id<>$2', [email, req.user.id])) throw bad('Cet e-mail est déjà utilisé.');
+  const emailNotifs = b.email_notifs === undefined ? req.user.email_notifs : !!b.email_notifs;
   const u = await db.one(
-    'UPDATE users SET name=$2, commune=$3, address=$4, landmark=$5, lat=$6, lng=$7, email=$8 WHERE id=$1 RETURNING *',
-    [req.user.id, name, commune, address, landmark, lat, lng, email || null]
+    'UPDATE users SET name=$2, commune=$3, address=$4, landmark=$5, lat=$6, lng=$7, email=$8, email_notifs=$9 WHERE id=$1 RETURNING *',
+    [req.user.id, name, commune, address, landmark, lat, lng, email || null, emailNotifs]
   );
   res.json(publicUser(u));
 }));
@@ -64,6 +65,18 @@ r.post('/push/subscribe', h(async (req, res) => {
   if (!/^https:\/\//.test(s.endpoint || '') || !s.keys || !s.keys.p256dh || !s.keys.auth) throw bad('Abonnement invalide.');
   await db.query(`INSERT INTO push_subs(user_id,endpoint,p256dh,auth) VALUES ($1,$2,$3,$4)
     ON CONFLICT (endpoint) DO UPDATE SET user_id=$1, p256dh=$3, auth=$4`, [req.user.id, s.endpoint, s.keys.p256dh, s.keys.auth]);
+  res.json({ ok: true });
+}));
+// Appli mobile : jeton Firebase de l'appareil.
+r.post('/push/device', h(async (req, res) => {
+  const t = String(req.body.token || '');
+  if (t.length < 20 || t.length > 400) throw bad('Jeton invalide.');
+  await db.query(`INSERT INTO device_tokens(user_id,token,platform) VALUES ($1,$2,$3)
+    ON CONFLICT (token) DO UPDATE SET user_id=$1, platform=$3`, [req.user.id, t, req.body.platform === 'ios' ? 'ios' : 'android']);
+  res.json({ ok: true });
+}));
+r.post('/push/device/remove', h(async (req, res) => {
+  await db.query('DELETE FROM device_tokens WHERE user_id=$1 AND token=$2', [req.user.id, String(req.body.token || '')]);
   res.json({ ok: true });
 }));
 r.post('/push/unsubscribe', h(async (req, res) => {

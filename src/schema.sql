@@ -210,3 +210,15 @@ CREATE TABLE IF NOT EXISTS push_subs (
   auth       TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- v7 : préférence de notification par e-mail
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_notifs BOOLEAN NOT NULL DEFAULT TRUE;
+
+-- v8 : appareils mobiles (Firebase Cloud Messaging)
+CREATE TABLE IF NOT EXISTS device_tokens (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token      TEXT NOT NULL UNIQUE,
+  platform   TEXT NOT NULL DEFAULT 'android',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

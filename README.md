@@ -106,3 +106,14 @@ Fonctionnement : la commande est créée « en attente de paiement » (stock ré
 - Prix, stock et totaux toujours recalculés côté serveur.
 - Les clés CinetPay restent dans les variables d'environnement, jamais dans le navigateur.
 - Remise d'une commande possible uniquement avec le bon code QR.
+
+## Notifications
+
+- **E-mail** : renseignez `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` (et `MAIL_FROM`) sur Render. Les clients qui ont une adresse e-mail reçoivent leurs notifications (commande, livraison, cotisation, annonces) sauf s'ils les désactivent dans Profil.
+- **Push navigateur** (site web) : automatique, sans configuration.
+- **Push dans l'appli Android** (Firebase) :
+  1. Créez un projet sur console.firebase.google.com, ajoutez une appli Android avec l'identifiant `ci.biosaveur.molomolo` et téléchargez `google-services.json`.
+  2. Dans Paramètres du projet → Comptes de service, générez une clé privée (fichier JSON) et collez son contenu dans la variable `FIREBASE_SERVICE_ACCOUNT` sur Render.
+  3. Pour compiler l'APK avec le push : placez `google-services.json` dans `android/app/` (compilation locale) ou ajoutez le secret GitHub `GOOGLE_SERVICES_JSON_BASE64` (`base64 -w0 google-services.json`) pour que GitHub Actions le fasse.
+  Sans ces étapes, l'appli fonctionne normalement, simplement sans notification en arrière-plan.
+- **iPhone** : le push dans l'appli iOS demande en plus un compte Apple Developer (clé APNs) ; non configuré.

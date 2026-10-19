@@ -385,6 +385,7 @@
       var opts = Object.keys(AUD).map(function (k) { return '<option value="' + k + '">' + AUD[k] + ' (' + d.counts[k] + ')</option>'; }).join('') +
         App.cfg.communes.map(function (c) { return '<option value="commune:' + esc(c) + '">Commune : ' + esc(c) + '</option>'; }).join('');
       return frame('annonces', head('SMS & annonces', 'Écrire à un groupe de clients') +
+        '<div class="note ' + (d.mail ? 'info' : '') + ' small">E-mail : ' + (d.mail ? 'activé — ' + d.withEmail + ' client(s) reçoivent aussi les messages par e-mail.' : 'non configuré (renseignez SMTP_HOST, SMTP_USER et SMTP_PASS sur Render).') + ' · Push appli mobile : ' + (d.fcm ? 'activé' : 'non configuré (FIREBASE_SERVICE_ACCOUNT)') + '.</div>' +
         '<div class="note info small">Le message arrive dans les notifications de l’appli du client (et en notification push s’il l’a activée). Après l’envoi, une liste WhatsApp vous permet de joindre les mêmes clients par WhatsApp (le SMS opérateur n’est pas branché).</div>' +
         '<section class="card pad stack" style="gap:12px"><form class="stack" style="gap:12px" data-form="annonce">' +
         '<div class="field"><label for="an-a">Destinataires</label><select id="an-a" name="audience">' + opts + '</select></div>' +

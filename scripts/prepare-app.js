@@ -15,13 +15,16 @@ if (!/^https:\/\//.test(api) && !/^http:\/\/(localhost|10\.0\.2\.2|192\.168\.)/.
   process.exit(1);
 }
 
+// Push dans l'appli : activé seulement si le projet Firebase (google-services.json) est présent dans l'APK.
+const push = fs.existsSync(path.join(root, 'android', 'app', 'google-services.json'));
+
 fs.rmSync(out, { recursive: true, force: true });
 fs.cpSync(src, out, { recursive: true });
 fs.writeFileSync(path.join(out, 'js', 'env.js'),
-  `/* Généré par scripts/prepare-app.js */\nwindow.BSV_ENV = { native: true, apiBase: ${JSON.stringify(api)} };\n`);
+  `/* Généré par scripts/prepare-app.js */\nwindow.BSV_ENV = { native: true, apiBase: ${JSON.stringify(api)}, push: ${push} };\n`);
 // le manifeste PWA n'a pas de sens dans l'appli
 fs.rmSync(path.join(out, 'manifest.webmanifest'), { force: true });
 let html = fs.readFileSync(path.join(out, 'index.html'), 'utf8');
 html = html.replace(/\s*<link rel="manifest"[^>]*>/, '');
 fs.writeFileSync(path.join(out, 'index.html'), html);
-console.log(`www/ prêt — API : ${api}`);
+console.log(`www/ prêt — API : ${api} — push mobile : ${push ? 'oui' : 'non (google-services.json absent)'}`);

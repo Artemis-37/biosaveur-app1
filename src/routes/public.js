@@ -18,7 +18,7 @@ function publicUser(u) {
   return {
     id: u.id, role: u.role, name: u.name, phone: u.phone, commune: u.commune, address: u.address,
     landmark: u.landmark, lat: u.lat, lng: u.lng, referral_code: u.referral_code, points: u.points,
-    created_at: u.created_at, company: u.company || '', email: u.email || '', avatar_url: u.avatar_url || '',
+    created_at: u.created_at, company: u.company || '', email: u.email || '', avatar_url: u.avatar_url || '', email_notifs: u.email_notifs !== false,
   };
 }
 

@@ -19,10 +19,13 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@capacitor/push-notifications": "^6.0.4",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",
     "express": "^4.21.1",
+    "firebase-admin": "^12.7.0",
     "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^6.9.16",
     "pg": "^8.13.1",
     "qrcode": "^1.5.4",
     "web-push": "^3.6.7"
