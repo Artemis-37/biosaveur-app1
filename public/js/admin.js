@@ -55,20 +55,25 @@
     }).join('') || '<p class="muted small">Aucune cotisation.</p>';
   }
   function evoChart(ev) {
-    var W = 560, H = 210, l = 36, b = 26, t = 12, r = 10, ih = H - b - t, iw = W - l - r, max = 1;
+    var W = 560, H = 250, l = 78, b = 30, t = 14, r = 14, ih = H - b - t, iw = W - l - r, max = 1;
     ev.forEach(function (x) { max = Math.max(max, x.clients, x.livraisons); });
-    var step = max > 200 ? 100 : max > 80 ? 50 : max > 30 ? 20 : max > 10 ? 10 : 2, top = Math.ceil(max / step) * step;
+    var step = max > 400 ? 200 : max > 200 ? 100 : max > 80 ? 50 : max > 30 ? 20 : max > 10 ? 10 : 2, top = Math.ceil(max / step) * step;
     var X = function (i) { return l + (ev.length < 2 ? iw / 2 : iw * i / (ev.length - 1)); }, Y = function (v) { return t + ih - v / top * ih; };
-    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Évolution des clients et des livraisons">';
-    for (var v = 0; v <= top; v += step) s += '<line x1="' + l + '" x2="' + (W - r) + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="#e3e8e5"/><text x="' + (l - 6) + '" y="' + (Y(v) + 4) + '" text-anchor="end" font-size="11" fill="#56625e">' + v + '</text>';
-    [['clients', '#103d3a'], ['livraisons', '#25b810']].forEach(function (k) {
-      s += '<polyline fill="none" stroke="' + k[1] + '" stroke-width="2.5" points="' + ev.map(function (x, i) { return X(i) + ',' + Y(x[k[0]]); }).join(' ') + '"/>';
-      ev.forEach(function (x, i) { s += '<circle cx="' + X(i) + '" cy="' + Y(x[k[0]]) + '" r="3.5" fill="' + k[1] + '"><title>' + k[0] + ' : ' + x[k[0]] + '</title></circle>'; });
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Évolution des clients et des livraisons"><defs>' +
+      '<linearGradient id="ec" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#103d3a" stop-opacity=".28"/><stop offset="1" stop-color="#103d3a" stop-opacity=".02"/></linearGradient>' +
+      '<linearGradient id="el" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#25b810" stop-opacity=".26"/><stop offset="1" stop-color="#25b810" stop-opacity=".02"/></linearGradient></defs>';
+    for (var v = 0; v <= top; v += step) s += '<line x1="' + l + '" x2="' + (W - r) + '" y1="' + Y(v) + '" y2="' + Y(v) + '" stroke="#e8edf0" stroke-width="1"/><text x="' + (l - 12) + '" y="' + (Y(v) + 4) + '" text-anchor="end" font-size="12" fill="#5d6b66">' + v + '</text>';
+    ev.forEach(function (x, i) { s += '<line x1="' + X(i) + '" x2="' + X(i) + '" y1="' + t + '" y2="' + Y(0) + '" stroke="#eef2f4" stroke-width="1"/>'; });
+    s += '<line x1="' + l + '" x2="' + l + '" y1="' + t + '" y2="' + Y(0) + '" stroke="#dfe6ea"/>';
+    [['livraisons', '#25b810', 'el', 'Livraisons effectuées'], ['clients', '#103d3a', 'ec', 'Clients inscrits (cumul)']].forEach(function (k) {
+      var pts = ev.map(function (x, i) { return [X(i), Y(x[k[0]])]; }), d = smooth(pts);
+      s += '<path d="' + d + ' L' + X(ev.length - 1) + ',' + Y(0) + ' L' + X(0) + ',' + Y(0) + ' Z" fill="url(#' + k[2] + ')"/>';
+      s += '<path d="' + d + '" fill="none" stroke="' + k[1] + '" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>';
+      ev.forEach(function (x, i) { s += '<circle cx="' + X(i) + '" cy="' + Y(x[k[0]]) + '" r="5" fill="#fff" stroke="' + k[1] + '" stroke-width="3"><title>' + k[3] + ' : ' + x[k[0]] + '</title></circle>'; });
     });
-    ev.forEach(function (x, i) { s += '<text x="' + X(i) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="11" fill="#56625e">' + App.MOIS[+x.month.slice(5, 7) - 1] + '</text>'; });
+    ev.forEach(function (x, i) { s += '<text x="' + X(i) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="13" fill="#4d5c57">' + App.MOIS[+x.month.slice(5, 7) - 1] + '</text>'; });
     return s + '</svg>';
   }
-  // Courbe d'évolution lissée (une série : total collecté = cotisations + ventes boutique).
   // Courbe lissée (spline monotone : jamais sous zéro ni de rebond artificiel).
   function smooth(pts) {
     var n = pts.length; if (n < 2) return 'M' + pts[0][0] + ',' + pts[0][1];
