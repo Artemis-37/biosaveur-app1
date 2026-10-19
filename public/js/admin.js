@@ -41,6 +41,12 @@
     });
   };
   var COT_ST = { active: ['En cours', '#25b810'], complete: ['Complètes', '#c08a00'], livree: ['Livrées', '#103d3a'], annulee: ['Annulées', '#9aa5a1'] };
+  var HALAL = ['Certificat halal en cours de validité', 'Certificat halal en cours de renouvellement', 'Certificat halal expiré', 'Aucun certificat'];
+  function halalSel(cur) {
+    var list = HALAL.slice(); if (cur && list.indexOf(cur) < 0) list.push(cur);
+    return '<div class="field"><label for="pe-halal">Certification halal</label><select id="pe-halal" name="halal"><option value="">— Choisir le certificat —</option>' +
+      list.map(function (o) { return '<option' + (o === cur ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select></div>';
+  }
   function statusBars(list) {
     var tot = list.reduce(function (s, x) { return s + x.n; }, 0) || 1;
     return list.map(function (x) {
@@ -245,7 +251,7 @@
       '<strong class="small" style="color:var(--vf)">Traçabilité</strong>' +
       '<div class="form-grid">' + f('lot_code', 'Code lot') + f('farm', 'Ferme d’origine') + '</div>' +
       '<div class="form-grid">' + f('slaughter_date', 'Date d’abattage', 'date') + f('cold_chain', 'Chaîne du froid') + '</div>' +
-      f('feed', 'Alimentation') + f('vet', 'Suivi vétérinaire') + f('halal', 'Certification halal') +
+      f('feed', 'Alimentation') + f('vet', 'Suivi vétérinaire') + halalSel(p.halal) +
       '<label class="chk"><input type="checkbox" name="flash"' + (p.flash ? ' checked' : '') + '> Offre flash (poulet du jour)</label>' +
       '<label class="chk"><input type="checkbox" name="visible"' + (p.visible ? ' checked' : '') + '> Visible dans la boutique</label>' +
       '<button class="btn p" type="submit">Enregistrer</button><button class="linkbtn" type="button" data-act="closeM">Annuler</button></form>');
