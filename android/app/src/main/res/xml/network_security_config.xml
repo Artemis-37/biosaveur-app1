@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- HTTPS uniquement, certificats du système uniquement : le certificat d'un proxy (Burp Suite, mitmproxy)
+     installé par l'utilisateur n'est PAS accepté par l'appli. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

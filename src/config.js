@@ -12,6 +12,7 @@ const isProd = env.NODE_ENV === 'production';
 const config = {
   port: Number(env.PORT) || 3000,
   isProd,
+  apiEncSecret: 'biosaveur-molo-molo-v1',
   databaseUrl: env.DATABASE_URL || 'postgres://localhost:5432/biosaveur',
   databaseSsl: bool(env.DATABASE_SSL, isProd),
   jwtSecret: env.JWT_SECRET || (isProd ? '' : 'dev-secret-a-changer'),

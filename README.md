@@ -117,3 +117,10 @@ Fonctionnement : la commande est créée « en attente de paiement » (stock ré
   3. Pour compiler l'APK avec le push : placez `google-services.json` dans `android/app/` (compilation locale) ou ajoutez le secret GitHub `GOOGLE_SERVICES_JSON_BASE64` (`base64 -w0 google-services.json`) pour que GitHub Actions le fasse.
   Sans ces étapes, l'appli fonctionne normalement, simplement sans notification en arrière-plan.
 - **iPhone** : le push dans l'appli iOS demande en plus un compte Apple Developer (clé APNs) ; non configuré.
+
+## Protection contre l'interception (Burp Suite / homme du milieu)
+
+- Le serveur recalcule toujours prix et totaux : modifier une requête ne change jamais le montant facturé.
+- Les échanges de l'appli sont chiffrés (AES-256-GCM, `src/envelope.js`) : un proxy voit `{"e":"…"}` et non les prix ; une requête modifiée est rejetée.
+- L'appli Android n'accepte que les certificats du système (`network_security_config.xml`) : le certificat de Burp installé sur le téléphone est refusé.
+- Limite : la clé est dans l'appli, donc un attaquant déterminé peut la retrouver. C'est un frein, pas la protection principale.

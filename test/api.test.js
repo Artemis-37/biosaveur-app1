@@ -328,3 +328,20 @@ test('sécurité : prix/total falsifiés (Burp / MITM) ignorés ou refusés et s
   const log = await a('GET', '/admin/audit');
   assert.ok(JSON.stringify(log.body).includes('ALERTE sécurité'), 'alerte sécurité journalisée');
 });
+
+test('enveloppe chiffrée : prix illisibles pour un proxy, requête altérée refusée', async () => {
+  const { seal, open } = require('../src/envelope');
+  const H = { 'Content-Type': 'application/json', 'X-Requested-With': 'biosaveur', 'X-Enc': '1' };
+  const raw = await fetch(base + '/products', { headers: H });
+  const txt = await raw.text();
+  assert.ok(!txt.includes('price'), 'aucun prix en clair dans la réponse');
+  const list = open(JSON.parse(txt).e);
+  assert.ok(Array.isArray(list) && list[0].price > 0, 'déchiffrable avec la clé de l’appli');
+  // connexion chiffrée puis corps altéré
+  let r = await fetch(base + '/auth/login', { method: 'POST', headers: H, body: JSON.stringify(seal({ phone: '0700000001', password: 'demo1234' })) });
+  assert.equal(r.status, 200);
+  const env = seal({ phone: '0700000001', password: 'demo1234' });
+  const flipped = env.e.slice(0, 20) + (env.e[20] === 'A' ? 'B' : 'A') + env.e.slice(21);
+  r = await fetch(base + '/auth/login', { method: 'POST', headers: H, body: JSON.stringify({ e: flipped }) });
+  assert.equal(r.status, 400, 'octet modifié = rejeté (GCM)');
+});

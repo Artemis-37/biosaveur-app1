@@ -95,18 +95,45 @@
       img.src = url;
     });
   };
+  // Enveloppe chiffrée AES-GCM des échanges (cf. src/envelope.js) : rien de lisible dans Burp Suite.
+  var ENC = (function () {
+    var sub = window.crypto && window.crypto.subtle, kp = null;
+    function b64(buf) { var a = new Uint8Array(buf), s = ''; for (var i = 0; i < a.length; i++) s += String.fromCharCode(a[i]); return btoa(s); }
+    function unb64(t) { var s = atob(t), a = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a; }
+    function key() { return kp || (kp = sub.digest('SHA-256', new TextEncoder().encode('biosaveur-molo-molo-v1')).then(function (h) { return sub.importKey('raw', h, 'AES-GCM', false, ['encrypt', 'decrypt']); })); }
+    return {
+      ok: !!(sub && window.TextEncoder && window.btoa),
+      seal: function (obj) {
+        var iv = crypto.getRandomValues(new Uint8Array(12));
+        return key().then(function (k) { return sub.encrypt({ name: 'AES-GCM', iv: iv }, k, new TextEncoder().encode(JSON.stringify(obj))); })
+          .then(function (ct) { var c = new Uint8Array(ct), o = new Uint8Array(12 + c.length); o.set(iv, 0); o.set(c, 12); return { e: b64(o) }; });
+      },
+      open: function (j) {
+        if (!j || typeof j.e !== 'string') return Promise.resolve(j);
+        var raw = unb64(j.e);
+        return key().then(function (k) { return sub.decrypt({ name: 'AES-GCM', iv: raw.slice(0, 12) }, k, raw.slice(12)); })
+          .then(function (pt) { return JSON.parse(new TextDecoder().decode(pt)); });
+      }
+    };
+  })();
   App.api = function (method, url, body) {
     var opt = { method: method, headers: { 'X-Requested-With': 'biosaveur' }, credentials: App.apiBase ? 'omit' : 'same-origin' };
     var tk = App.token(); if (tk) opt.headers.Authorization = 'Bearer ' + tk;
     if (App.native) opt.headers['X-Client'] = 'app';
-    if (body !== undefined) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+    if (ENC.ok) opt.headers['X-Enc'] = '1';
+    var prep = Promise.resolve();
+    if (body !== undefined) {
+      opt.headers['Content-Type'] = 'application/json';
+      if (ENC.ok) prep = ENC.seal(body).then(function (env) { opt.body = JSON.stringify(env); });
+      else opt.body = JSON.stringify(body);
+    }
     // délai maximal : un serveur gratuit qui se réveille peut mettre ~1 min
     var ctl = window.AbortController ? new AbortController() : null, timedOut = false;
     var to = ctl ? setTimeout(function () { timedOut = true; ctl.abort(); }, 75000) : null;
     if (ctl) opt.signal = ctl.signal;
-    return fetch(App.apiBase + '/api' + url, opt).then(function (r) {
+    return prep.then(function () { return fetch(App.apiBase + '/api' + url, opt); }).then(function (r) {
       clearTimeout(to);
-      return r.json().catch(function () { return {}; }).then(function (j) {
+      return r.json().catch(function () { return {}; }).then(function (j) { return ENC.ok ? ENC.open(j).catch(function () { return {}; }) : j; }).then(function (j) {
         if (!r.ok) {
           var e = new Error(j.error || 'Erreur ' + r.status); e.status = r.status;
           if (r.status === 401) {
