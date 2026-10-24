@@ -422,3 +422,13 @@ html.native footer.cf{display:none}
 @media (max-width:600px){.cal-d{min-height:54px;padding:4px}.cal-d .xs{display:none}}
 
 .bellbtn{position:relative}.staffbar .bellbtn .badge{position:absolute;top:2px;right:0;min-width:17px;height:17px;font-size:10px}
+
+/* Tirer pour actualiser */
+html,body{overscroll-behavior-y:contain}
+.ptr{position:fixed;left:50%;top:env(safe-area-inset-top,0px);z-index:999;width:42px;height:42px;border-radius:50%;background:#fff;color:var(--vf);box-shadow:0 4px 14px rgba(16,61,58,.22);display:none;align-items:center;justify-content:center;pointer-events:none}
+.ptr.on{display:flex}
+.ptr.back{transition:transform .25s ease,opacity .25s ease;opacity:0}
+.ptr .ic{width:22px;height:22px;transition:transform .15s}
+.ptr .ptr-spin{display:none;width:22px;height:22px;border:3px solid #cfe0da;border-top-color:var(--vf);border-radius:50%;animation:ptrspin .7s linear infinite}
+.ptr.spin .ic{display:none}.ptr.spin .ptr-spin{display:block}
+@keyframes ptrspin{to{transform:rotate(360deg)}}

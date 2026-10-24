@@ -209,15 +209,21 @@ async function rebaseDemo() {
     anchor = a ? a.d : today;
   }
   const n = Math.round((Date.parse(today) - Date.parse(anchor)) / 86400000);
+  // Seules les lignes de démonstration d'origine sont décalées : on retient le dernier id de chaque table
+  // au moment où la démo est créée. Les vraies commandes, messages et notifications ne bougent jamais.
+  const TABLES = ['orders', 'cotisations', 'cotisation_payments', 'announcements', 'messages', 'notifications'];
+  let cut = null;
+  try { cut = JSON.parse((await db.getSetting('demo_cutoff')) || 'null'); } catch (_) { cut = null; }
+  if (!cut) {
+    cut = {};
+    for (const t of TABLES) cut[t] = (await db.one(`SELECT COALESCE(max(id),0)::int AS m FROM ${t}`)).m;
+    await db.setSetting('demo_cutoff', JSON.stringify(cut));
+  }
   if (n > 0) {
     await db.tx(async (c) => {
       const iv = `${n} days`;
-      await c.query('UPDATE orders SET day = day + $1::interval, created_at = created_at + $1::interval, delivered_at = delivered_at + $1::interval', [iv]);
-      await c.query('UPDATE cotisations SET created_at = created_at + $1::interval', [iv]);
-      await c.query('UPDATE cotisation_payments SET created_at = created_at + $1::interval', [iv]);
-      await c.query('UPDATE announcements SET created_at = created_at + $1::interval', [iv]);
-      await c.query('UPDATE messages SET created_at = created_at + $1::interval', [iv]);
-      await c.query('UPDATE notifications SET created_at = created_at + $1::interval', [iv]);
+      await c.query('UPDATE orders SET day = day + $1::interval, created_at = created_at + $1::interval, delivered_at = delivered_at + $1::interval WHERE id <= $2', [iv, cut.orders]);
+      for (const t of TABLES.slice(1)) await c.query(`UPDATE ${t} SET created_at = created_at + $1::interval WHERE id <= $2`, [iv, cut[t]]);
       await c.query('UPDATE products SET slaughter_date = slaughter_date + $1::interval', [iv]);
       await c.query('UPDATE users SET created_at = created_at + $1::interval WHERE demo', [iv]);
     });

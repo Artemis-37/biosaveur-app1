@@ -299,4 +299,45 @@
       if (changed) document.querySelectorAll('[data-badge=acct]').forEach(function (el) { var n = b.notifications + b.messages; el.textContent = n; el.hidden = !n; });
     }).catch(function () { /* silencieux */ });
   };
+  /* ---------- tirer vers le bas pour actualiser (comme Facebook) ---------- */
+  (function () {
+    var startY = 0, pull = 0, active = false, busy = false, ind = null, LIM = 64;
+    function node() {
+      if (!ind) {
+        ind = document.createElement('div'); ind.className = 'ptr'; ind.setAttribute('aria-hidden', 'true');
+        ind.innerHTML = '<svg class="ic" viewBox="0 0 24 24"><path d="M12 5v13M6 13l6 6 6-6"/></svg><span class="ptr-spin"></span>';
+        document.body.appendChild(ind);
+      }
+      return ind;
+    }
+    function show(d, spin) {
+      var n = node(); n.classList.toggle('on', d > 0 || spin); n.classList.toggle('spin', !!spin);
+      n.style.transform = 'translate(-50%,' + (d - 52) + 'px)';
+      n.firstChild.style.transform = 'rotate(' + (d >= LIM ? 180 : 0) + 'deg)';
+    }
+    function hide() { var n = node(); n.classList.add('back'); show(0, false); setTimeout(function () { n.classList.remove('back', 'on'); busy = false; }, 250); }
+    document.addEventListener('touchstart', function (e) {
+      active = false; pull = 0;
+      if (busy || e.touches.length !== 1 || (window.pageYOffset || document.documentElement.scrollTop) > 0) return;
+      if (e.target.closest && e.target.closest('.ov,.leaflet-container,textarea,input,select,.chips,.slots')) return;
+      startY = e.touches[0].clientY; active = true;
+    }, { passive: true });
+    document.addEventListener('touchmove', function (e) {
+      if (!active) return;
+      var dy = e.touches[0].clientY - startY;
+      if (dy <= 0 || (window.pageYOffset || document.documentElement.scrollTop) > 0) { if (pull) show(0, false); pull = 0; return; }
+      pull = Math.min(dy * 0.5, 96);
+      if (pull > 8 && e.cancelable) e.preventDefault();
+      node().classList.remove('back'); show(pull, false);
+    }, { passive: false });
+    document.addEventListener('touchend', function () {
+      if (!active) return; active = false;
+      if (pull >= LIM && !busy) {
+        busy = true; show(LIM, true);
+        App.loadConfig().catch(function () { /* hors ligne : on réaffiche quand même */ }).then(function () { App.render(); App.refreshBadges(); });
+        setTimeout(hide, 900);
+      } else if (pull) hide();
+      pull = 0;
+    }, { passive: true });
+  })();
 })();
